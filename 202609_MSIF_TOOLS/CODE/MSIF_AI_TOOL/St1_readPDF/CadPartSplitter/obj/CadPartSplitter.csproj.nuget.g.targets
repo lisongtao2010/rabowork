@@ -1,0 +1,6 @@
+﻿<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<Project ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ImportGroup Condition=" '$(ExcludeRestorePackageImports)' != 'true' ">
+    <Import Project="$(NuGetPackageRoot)docnet.core\2.6.0\build\net45\Docnet.Core.targets" Condition="Exists('$(NuGetPackageRoot)docnet.core\2.6.0\build\net45\Docnet.Core.targets')" />
+  </ImportGroup>
+</Project>

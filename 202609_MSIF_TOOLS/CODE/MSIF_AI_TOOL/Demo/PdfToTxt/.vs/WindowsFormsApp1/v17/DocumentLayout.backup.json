@@ -1,0 +1,52 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "D:\\work\\260818_MSIF\u4F5C\u6210\u30C4\u30FC\u30EB\\\u30C4\u30FC\u30EB\\PyMuPDF\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{7B704B22-561D-4ECE-8632-E00BE812C09B}|WindowsFormsApp1\\WindowsFormsApp1.csproj|d:\\work\\260818_msif\u4F5C\u6210\u30C4\u30FC\u30EB\\\u30C4\u30FC\u30EB\\pymupdf\\windowsformsapp1\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{7B704B22-561D-4ECE-8632-E00BE812C09B}|WindowsFormsApp1\\WindowsFormsApp1.csproj|solutionrelative:windowsformsapp1\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{7B704B22-561D-4ECE-8632-E00BE812C09B}|WindowsFormsApp1\\WindowsFormsApp1.csproj|D:\\work\\260818_MSIF\u4F5C\u6210\u30C4\u30FC\u30EB\\\u30C4\u30FC\u30EB\\PyMuPDF\\windowsformsapp1\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form",
+      "RelativeMoniker": "D:0:0:{7B704B22-561D-4ECE-8632-E00BE812C09B}|WindowsFormsApp1\\WindowsFormsApp1.csproj|solutionrelative:windowsformsapp1\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 0,
+          "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "Form1.cs",
+              "DocumentMoniker": "D:\\work\\260818_MSIF\u4F5C\u6210\u30C4\u30FC\u30EB\\\u30C4\u30FC\u30EB\\PyMuPDF\\WindowsFormsApp1\\Form1.cs",
+              "RelativeDocumentMoniker": "WindowsFormsApp1\\Form1.cs",
+              "ToolTip": "D:\\work\\260818_MSIF\u4F5C\u6210\u30C4\u30FC\u30EB\\\u30C4\u30FC\u30EB\\PyMuPDF\\WindowsFormsApp1\\Form1.cs",
+              "RelativeToolTip": "WindowsFormsApp1\\Form1.cs",
+              "ViewState": "AgIAAJgAAAAAAAAAAAAYwKIAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-10-12T03:48:10.544Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "Form1.cs [\u30C7\u30B6\u30A4\u30F3]",
+              "DocumentMoniker": "D:\\work\\260818_MSIF\u4F5C\u6210\u30C4\u30FC\u30EB\\\u30C4\u30FC\u30EB\\PyMuPDF\\WindowsFormsApp1\\Form1.cs",
+              "RelativeDocumentMoniker": "WindowsFormsApp1\\Form1.cs",
+              "ToolTip": "D:\\work\\260818_MSIF\u4F5C\u6210\u30C4\u30FC\u30EB\\test\\WindowsFormsApp1\\WindowsFormsApp1\\Form1.cs [\u30C7\u30B6\u30A4\u30F3]",
+              "RelativeToolTip": "..\\..\\test\\WindowsFormsApp1\\WindowsFormsApp1\\Form1.cs [\u30C7\u30B6\u30A4\u30F3]",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-10-12T03:47:28.222Z"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
