@@ -3,8 +3,16 @@
   "WorkspaceRootPath": "D:\\Github_lis2010\\rabowork\\202609_MSIF_TOOLS\\CODE\\MSIF_AI_TOOL\\St1_readPDF\\CadPartSplitter\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{8F3A2C1E-4B7D-4E9A-9C2F-1A2B3C4D5E6F}|CadPartSplitter.csproj|d:\\github_lis2010\\rabowork\\202609_msif_tools\\code\\msif_ai_tool\\st1_readpdf\\cadpartsplitter\\mainform.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form",
+      "AbsoluteMoniker": "D:0:0:{8F3A2C1E-4B7D-4E9A-9C2F-1A2B3C4D5E6F}|CadPartSplitter.csproj|D:\\Github_lis2010\\rabowork\\202609_MSIF_TOOLS\\CODE\\MSIF_AI_TOOL\\St1_readPDF\\CadPartSplitter\\mainform.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form",
       "RelativeMoniker": "D:0:0:{8F3A2C1E-4B7D-4E9A-9C2F-1A2B3C4D5E6F}|CadPartSplitter.csproj|solutionrelative:mainform.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{8F3A2C1E-4B7D-4E9A-9C2F-1A2B3C4D5E6F}|CadPartSplitter.csproj|d:\\github_lis2010\\rabowork\\202609_msif_tools\\code\\msif_ai_tool\\st1_readpdf\\cadpartsplitter\\partsplitterservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{8F3A2C1E-4B7D-4E9A-9C2F-1A2B3C4D5E6F}|CadPartSplitter.csproj|solutionrelative:partsplitterservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{8F3A2C1E-4B7D-4E9A-9C2F-1A2B3C4D5E6F}|CadPartSplitter.csproj|D:\\Github_lis2010\\rabowork\\202609_MSIF_TOOLS\\CODE\\MSIF_AI_TOOL\\St1_readPDF\\CadPartSplitter\\partinfo.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{8F3A2C1E-4B7D-4E9A-9C2F-1A2B3C4D5E6F}|CadPartSplitter.csproj|solutionrelative:partinfo.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{8F3A2C1E-4B7D-4E9A-9C2F-1A2B3C4D5E6F}|CadPartSplitter.csproj|D:\\Github_lis2010\\rabowork\\202609_MSIF_TOOLS\\CODE\\MSIF_AI_TOOL\\St1_readPDF\\CadPartSplitter\\mainform.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
@@ -18,7 +26,7 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 6,
+          "SelectedChildIndex": 8,
           "Children": [
             {
               "$type": "Bookmark",
@@ -43,6 +51,31 @@
             {
               "$type": "Document",
               "DocumentIndex": 1,
+              "Title": "PartSplitterService.cs",
+              "DocumentMoniker": "D:\\Github_lis2010\\rabowork\\202609_MSIF_TOOLS\\CODE\\MSIF_AI_TOOL\\St1_readPDF\\CadPartSplitter\\PartSplitterService.cs",
+              "RelativeDocumentMoniker": "PartSplitterService.cs",
+              "ToolTip": "D:\\Github_lis2010\\rabowork\\202609_MSIF_TOOLS\\CODE\\MSIF_AI_TOOL\\St1_readPDF\\CadPartSplitter\\PartSplitterService.cs",
+              "RelativeToolTip": "PartSplitterService.cs",
+              "ViewState": "AgIAAJ0AAAAAAAAAAAAgwK0AAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-11-01T03:11:23.01Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "PartInfo.cs",
+              "DocumentMoniker": "D:\\Github_lis2010\\rabowork\\202609_MSIF_TOOLS\\CODE\\MSIF_AI_TOOL\\St1_readPDF\\CadPartSplitter\\PartInfo.cs",
+              "RelativeDocumentMoniker": "PartInfo.cs",
+              "ToolTip": "D:\\Github_lis2010\\rabowork\\202609_MSIF_TOOLS\\CODE\\MSIF_AI_TOOL\\St1_readPDF\\CadPartSplitter\\PartInfo.cs",
+              "RelativeToolTip": "PartInfo.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABoAAAAUAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-11-01T03:11:14.861Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
               "Title": "MainForm.cs",
               "DocumentMoniker": "D:\\Github_lis2010\\rabowork\\202609_MSIF_TOOLS\\CODE\\MSIF_AI_TOOL\\St1_readPDF\\CadPartSplitter\\MainForm.cs",
               "RelativeDocumentMoniker": "MainForm.cs",

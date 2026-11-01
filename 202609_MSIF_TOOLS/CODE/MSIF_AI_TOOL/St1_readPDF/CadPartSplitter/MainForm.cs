@@ -53,6 +53,7 @@ namespace CadPartSplitter
             numKh.Value      = defaults.DilateKernelHeight;
             chkAutoMask.Checked = defaults.AutoMaskRightColumn;
             chkDebug.Checked = defaults.SaveDebugImages;
+            chkDropTextHeavy.Checked = defaults.DropTextHeavyParts;
 
             SetOutputDirectory(Path.Combine(Environment.CurrentDirectory, "output"));
         }
@@ -270,6 +271,7 @@ namespace CadPartSplitter
                 PdfPageIndex       = pageIndex,
                 RightMaskRatio     = maskRatio,
                 AutoMaskRightColumn = chkAutoMask.Checked,
+                DropTextHeavyParts  = chkDropTextHeavy.Checked,
                 MinContourArea     = area,
                 Padding            = (int)numPad.Value,
                 DilateKernelWidth  = Math.Max(1, (int)numKw.Value),

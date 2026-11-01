@@ -47,6 +47,7 @@ namespace CadPartSplitter
             this.numKh = new System.Windows.Forms.NumericUpDown();
             this.chkAutoMask = new System.Windows.Forms.CheckBox();
             this.chkDebug = new System.Windows.Forms.CheckBox();
+            this.chkDropTextHeavy = new System.Windows.Forms.CheckBox();
             this.panelActions = new System.Windows.Forms.Panel();
             this.btnStart = new System.Windows.Forms.Button();
             this.btnOpenOutput = new System.Windows.Forms.Button();
@@ -182,6 +183,7 @@ namespace CadPartSplitter
             this.grpOptions.Controls.Add(this.numKh);
             this.grpOptions.Controls.Add(this.chkAutoMask);
             this.grpOptions.Controls.Add(this.chkDebug);
+            this.grpOptions.Controls.Add(this.chkDropTextHeavy);
             this.grpOptions.Dock = System.Windows.Forms.DockStyle.Fill;
             this.grpOptions.Location = new System.Drawing.Point(8, 110);
             this.grpOptions.Margin = new System.Windows.Forms.Padding(8, 6, 8, 0);
@@ -351,6 +353,18 @@ namespace CadPartSplitter
             this.chkDebug.TabIndex = 14;
             this.chkDebug.Text = "保存调试图";
             this.chkDebug.UseVisualStyleBackColor = true;
+            //
+            // chkDropTextHeavy
+            //
+            this.chkDropTextHeavy.AutoSize = true;
+            this.chkDropTextHeavy.Checked = true;
+            this.chkDropTextHeavy.CheckState = System.Windows.Forms.CheckState.Checked;
+            this.chkDropTextHeavy.Location = new System.Drawing.Point(752, 26);
+            this.chkDropTextHeavy.Name = "chkDropTextHeavy";
+            this.chkDropTextHeavy.Size = new System.Drawing.Size(100, 21);
+            this.chkDropTextHeavy.TabIndex = 16;
+            this.chkDropTextHeavy.Text = "筛除表格残片";
+            this.chkDropTextHeavy.UseVisualStyleBackColor = true;
             // 
             // panelActions
             // 
@@ -491,6 +505,7 @@ namespace CadPartSplitter
         private System.Windows.Forms.NumericUpDown numKh;
         private System.Windows.Forms.CheckBox chkAutoMask;
         private System.Windows.Forms.CheckBox chkDebug;
+        private System.Windows.Forms.CheckBox chkDropTextHeavy;
         private System.Windows.Forms.Panel panelActions;
         private System.Windows.Forms.Button btnStart;
         private System.Windows.Forms.Button btnOpenOutput;

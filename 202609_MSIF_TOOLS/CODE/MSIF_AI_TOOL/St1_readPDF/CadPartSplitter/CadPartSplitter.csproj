@@ -65,6 +65,8 @@
     <Compile Include="PartInfo.cs" />
     <Compile Include="PartText.cs" />
     <Compile Include="PartTextExtractor.cs" />
+    <Compile Include="Callout.cs" />
+    <Compile Include="CalloutExtractor.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

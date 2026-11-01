@@ -74,28 +74,8 @@ namespace CadPartSplitter
                     double scaleX = imgWidth  / pageW;
                     double scaleY = imgHeight / pageH;
 
-                    var words   = new List<WordBox>();
-                    int outside = 0;
-
-                    foreach (var w in page.GetWords())
-                    {
-                        string text = (w.Text ?? string.Empty).Trim();
-                        if (text.Length == 0)
-                            continue;
-
-                        var bb = w.BoundingBox;
-                        double x  = bb.Left * scaleX;
-                        double y  = (pageH - bb.Top) * scaleY;      // PDF 的 Top 是上边缘（Y 向上）
-                        double cw = (bb.Right - bb.Left) * scaleX;
-                        double ch = (bb.Top - bb.Bottom) * scaleY;
-                        if (cw <= 0 || ch <= 0)
-                            continue;
-
-                        if (x + cw < 0 || y + ch < 0 || x > imgWidth || y > imgHeight)
-                            outside++;
-
-                        words.Add(new WordBox { Text = text, X = x, Y = y, W = cw, H = ch });
-                    }
+                    int outside;
+                    var words = ReadPageWords(page, pageH, scaleX, scaleY, imgWidth, imgHeight, out outside);
 
                     write($"[INFO] PDF 文字层：{words.Count} 个词（页面 {pageW:0.#}×{pageH:0.#} pt，"
                           + $"缩放 {scaleX:0.####}×{scaleY:0.####}）");
@@ -174,9 +154,45 @@ namespace CadPartSplitter
         }
 
         /// <summary>
-        /// 把词级文字按「同一行」合并成可读文本行（供 parts_text.txt 使用）。
+        /// 读取一页的全部词并换算成页面像素坐标（原点左上、Y 向下）。
+        /// 空白词、退化框（宽或高 ≤ 0）会被丢弃；<paramref name="outside"/> 返回换算后落在画面外的词数。
+        /// </summary>
+        private static List<WordBox> ReadPageWords(
+            UglyToad.PdfPig.Content.Page page, double pageH,
+            double scaleX, double scaleY, int imgWidth, int imgHeight, out int outside)
+        {
+            var words = new List<WordBox>();
+            outside = 0;
+
+            foreach (var w in page.GetWords())
+            {
+                string text = (w.Text ?? string.Empty).Trim();
+                if (text.Length == 0)
+                    continue;
+
+                var bb = w.BoundingBox;
+                double x  = bb.Left * scaleX;
+                double y  = (pageH - bb.Top) * scaleY;      // PDF 的 Top 是上边缘（Y 向上）
+                double cw = (bb.Right - bb.Left) * scaleX;
+                double ch = (bb.Top - bb.Bottom) * scaleY;
+                if (cw <= 0 || ch <= 0)
+                    continue;
+
+                if (x + cw < 0 || y + ch < 0 || x > imgWidth || y > imgHeight)
+                    outside++;
+
+                words.Add(new WordBox { Text = text, X = x, Y = y, W = cw, H = ch });
+            }
+
+            return words;
+        }
+
+        /// <summary>
+        /// 把词级文字按「同一行」合并成可读文本行（`--merge-text-lines` 时的清单粒度）。
         /// 判行为「纵向中心差 ≤ 0.6 倍字高」；同一行内按 X 排序，
         /// 词间水平间隙大于半个字高时补一个空格，否则直接拼接（适应中/日文紧排）。
+        /// 词若已被圈号标注标记（<see cref="PartText.CalloutDisplay"/> 非空），
+        /// 在它原来的位置上输出「①1」这样的带圈形式，而不是裸数字。
         /// </summary>
         public static List<PartTextLine> BuildLines(List<PartText> texts)
         {
@@ -184,29 +200,7 @@ namespace CadPartSplitter
             if (texts == null || texts.Count == 0)
                 return result;
 
-            var groups = new List<List<PartText>>();
-
-            foreach (var t in texts.OrderBy(t => t.PixelY).ThenBy(t => t.PixelX))
-            {
-                double cy  = t.PixelY + t.PixelH / 2.0;
-                double tol = Math.Max(4.0, t.PixelH * 0.6);
-                List<PartText> best = null;
-                double bestDist = double.MaxValue;
-
-                foreach (var g in groups)
-                {
-                    double gy = g[0].PixelY + g[0].PixelH / 2.0;
-                    double d  = Math.Abs(gy - cy);
-                    if (d <= tol && d < bestDist)
-                    {
-                        best     = g;
-                        bestDist = d;
-                    }
-                }
-
-                if (best == null) groups.Add(new List<PartText> { t });
-                else              best.Add(t);
-            }
+            var groups = GroupIntoLines(texts);
 
             foreach (var g in groups)
             {
@@ -218,7 +212,9 @@ namespace CadPartSplitter
                 {
                     if (sb.Length > 0 && t.PixelX - prevRight > Math.Max(2.0, t.PixelH * 0.5))
                         sb.Append(' ');
-                    sb.Append(t.Text);
+                    // 圈号标注的圈内数字：在它原来的位置输出 ①1 这类带圈形式
+                    //（CalloutDisplay 由 CalloutExtractor.MarkCalloutWords 按坐标回填，未标记的词为 null）
+                    sb.Append(string.IsNullOrEmpty(t.CalloutDisplay) ? t.Text : t.CalloutDisplay);
                     prevRight = t.PixelX + t.PixelW;
                 }
 
@@ -251,6 +247,84 @@ namespace CadPartSplitter
             });
 
             return result;
+        }
+
+        /// <summary>
+        /// 把词级文字**逐个转成一行**（供 parts_text.txt 使用，默认粒度）。
+        ///
+        /// 与 <see cref="BuildLines"/> 的区别：不做「拼成一句」，一个 PDF 词就是一条记录，
+        /// 坐标是该词自己的外接框（而不是整行的并集框），文本也只含这一个词。
+        /// 这么做的原因：合并后的 `①1 鴨居 G部` 只有一个并集坐标，
+        /// 下游按行解析时分不清 `鴨居` 和 `G部` 各自的框在哪。
+        ///
+        /// 分行规则与 <see cref="BuildLines"/> 完全相同（共用 <see cref="GroupIntoLines"/>），
+        /// 所以行序仍是自上而下、行内仍是从左到右 —— 拆成多行后阅读顺序与原图一致，
+        /// 相邻的几条就是原本同一行上的词。
+        /// 圈号标注回填的 ①1 同样生效（<see cref="PartText.CalloutDisplay"/> 优先于
+        /// <see cref="PartText.Text"/>）。
+        /// </summary>
+        public static List<PartTextLine> BuildWordLines(List<PartText> texts)
+        {
+            var result = new List<PartTextLine>();
+            if (texts == null || texts.Count == 0)
+                return result;
+
+            foreach (var g in GroupIntoLines(texts))
+            {
+                foreach (var t in g.OrderBy(t => t.PixelX))
+                {
+                    result.Add(new PartTextLine
+                    {
+                        // 圈号标注的圈内数字：输出 ①1 这类带圈形式（未标记的词为 null，用原文本）
+                        Text      = string.IsNullOrEmpty(t.CalloutDisplay) ? t.Text : t.CalloutDisplay,
+                        PixelX    = t.PixelX,
+                        PixelY    = t.PixelY,
+                        PixelW    = t.PixelW,
+                        PixelH    = t.PixelH,
+                        LocalX    = t.LocalX,
+                        LocalY    = t.LocalY,
+                        WordCount = 1
+                    });
+                }
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// 把词按「同一行」分组：纵向中心差 ≤ 0.6 倍字高（相对该组首个词）即为同一行。
+        /// 组的顺序 = 首次出现顺序（即自上而下）；组内词的顺序未定，调用方按 X 排序。
+        /// <see cref="BuildLines"/> 与 <see cref="BuildWordLines"/> 共用这套分行规则。
+        /// </summary>
+        private static List<List<PartText>> GroupIntoLines(List<PartText> texts)
+        {
+            var groups = new List<List<PartText>>();
+            if (texts == null || texts.Count == 0)
+                return groups;
+
+            foreach (var t in texts.OrderBy(t => t.PixelY).ThenBy(t => t.PixelX))
+            {
+                double cy  = t.PixelY + t.PixelH / 2.0;
+                double tol = Math.Max(4.0, t.PixelH * 0.6);
+                List<PartText> best = null;
+                double bestDist = double.MaxValue;
+
+                foreach (var g in groups)
+                {
+                    double gy = g[0].PixelY + g[0].PixelH / 2.0;
+                    double d  = Math.Abs(gy - cy);
+                    if (d <= tol && d < bestDist)
+                    {
+                        best     = g;
+                        bestDist = d;
+                    }
+                }
+
+                if (best == null) groups.Add(new List<PartText> { t });
+                else              best.Add(t);
+            }
+
+            return groups;
         }
 
         /// <summary>取落在某个零件图框内（重叠率 ≥ 阈值）的词，按 Y、X 排序后转成 PartText。</summary>
@@ -332,10 +406,29 @@ namespace CadPartSplitter
             if (tableWords == null || tableWords.Count == 0)
                 return blocks;
 
+            // ①② 分行 + 行内按水平间隙拆单元格（与表格块检测共用同一套启发式）
+            List<TableRow> rows = BuildRows(tableWords);
+
+            // ③④⑤ 按行结构变化分表 → 每张表内单独推断列号 → 求外接框
+            return BuildBlockList(rows, tableStartX, imgWidth, mmPerPx);
+        }
+
+        /// <summary>
+        /// 把词整理成「行 → 单元格」（<see cref="BuildTables"/> 与 <see cref="DetectTableAreas"/> 共用）。
+        ///
+        ///   · 分行：纵向中心差 ≤ 0.6 倍字高（与 <see cref="BuildLines"/> 一致）；
+        ///   · 单元格：行内按 X 排序，与前一个词的水平间隙 &gt; max(24px, 1.0 倍字高) 即断开。
+        /// </summary>
+        private static List<TableRow> BuildRows(List<PartText> words)
+        {
+            var rows = new List<TableRow>();
+            if (words == null || words.Count == 0)
+                return rows;
+
             // ① 分行
             var rowGroups = new List<List<PartText>>();
 
-            foreach (var t in tableWords)
+            foreach (var t in words)
             {
                 double cy  = t.PixelY + t.PixelH / 2.0;
                 double tol = Math.Max(4.0, t.PixelH * 0.6);
@@ -358,8 +451,6 @@ namespace CadPartSplitter
             }
 
             // ② 行内按水平间隙拆单元格
-            var rows = new List<TableRow>();
-
             foreach (var g in rowGroups)
             {
                 var ordered   = g.OrderBy(t => t.PixelX).ToList();
@@ -385,10 +476,461 @@ namespace CadPartSplitter
                 rows.Add(row);
             }
 
-            rows = rows.OrderBy(r => r.PixelY).ToList();
+            return rows.OrderBy(r => r.PixelY).ToList();
+        }
 
-            // ③④⑤ 按行结构变化分表 → 每张表内单独推断列号 → 求外接框
-            return BuildBlockList(rows, tableStartX, imgWidth, mmPerPx);
+        // ── 表格块检测（供零件检测阶段做表格遮蔽）────────────────────────────
+
+        /// <summary>表格块至少需要的行数（且其中 ≥ 2 行的单元格数 ≥ 3）。</summary>
+        private const int TableAreaMinRows = 3;
+
+        /// <summary>每行单元格数的中位数下限（表格的特征是多列，尺寸标注是单行线性排列）。</summary>
+        private const int TableAreaMinCells = 3;
+
+        /// <summary>只有 2 行的表（例如 2 行 7 列的型番表）要求列数 ≥ 该值。</summary>
+        private const int TableAreaMinColumnsForShort = 4;
+
+        /// <summary>表格块至少需要的词数。</summary>
+        private const int TableAreaMinWords = 8;
+
+        /// <summary>表格块至少需要的字符数（大量合并单元格的表題欄词很少，用字符数兜底）。</summary>
+        private const int TableAreaMinChars = 24;
+
+        /// <summary>行间列对齐率下限（真表格每行列位置高度一致，散落的尺寸标注对不齐）。</summary>
+        private const double TableAreaMinAlign = 0.60;
+
+        /// <summary>行距规律性下限（相邻行中心距落在中位数 0.5~1.6 倍的比例）；表題欄类表格靠这一条。</summary>
+        private const double TableAreaMinPitchRegularity = 0.80;
+
+        /// <summary>
+        /// 仅解析文字层，推断「表格 / 表題欄」矩形（页面像素坐标）；不依赖零件检测结果，也不需要遮蔽线。
+        ///
+        /// 用途：给 <see cref="PartDetector"/> 做「按块遮蔽」，取代「把右侧整列涂黑」。
+        /// 整列遮蔽假设表格区与零件区在 X 方向可分；当表格在右上、零件视图在下方中部时，
+        /// 密实列带会一路吃进零件区，把中部视图整块抹掉（现象：输出图只剩左侧一半）。
+        ///
+        /// 判据（见 <see cref="LooksLikeTable"/>）：
+        ///   · 行数 ≥ 3 且每行单元格数中位数 ≥ 3（或 2 行 + 列数 ≥ 4）；
+        ///   · 列数 ≥ 3、词数 ≥ 8、行间列对齐率 ≥ 0.60；
+        ///   · 块宽 ≥ 图宽 4%、块高 ≥ 图高 1.2%、块面积 ≤ 全图 45%。
+        /// 无文字层 / 解析失败 / 未检出时返回空列表（调用方自动回退整列遮蔽）。
+        /// </summary>
+        public static List<PageRect> DetectTableAreas(
+            string pdfPath, int pageIndex, int imgWidth, int imgHeight, Action<string> log)
+        {
+            Action<string> write = log ?? (_ => { });
+            var areas = new List<PageRect>();
+
+            if (string.IsNullOrEmpty(pdfPath) || imgWidth <= 0 || imgHeight <= 0)
+                return areas;
+
+            try
+            {
+                using (var doc = PdfDocument.Open(pdfPath))
+                {
+                    if (pageIndex < 0 || pageIndex >= doc.NumberOfPages)
+                        return areas;
+
+                    var page = doc.GetPage(pageIndex + 1);   // PdfPig 页码从 1 开始
+                    if (page.Width <= 0 || page.Height <= 0)
+                        return areas;
+
+                    double scaleX = imgWidth  / page.Width;
+                    double scaleY = imgHeight / page.Height;
+
+                    int outside;
+                    var raw = ReadPageWords(page, page.Height, scaleX, scaleY, imgWidth, imgHeight, out outside);
+                    if (raw.Count == 0)
+                        return areas;
+
+                    var words = new List<PartText>(raw.Count);
+                    foreach (var w in raw)
+                        words.Add(ToPartText(w, 1.0, 0, 0));   // 此处只用像素坐标，mm 不参与计算
+
+                    var candidateRows = SplitRowsByWideGaps(BuildRows(words));
+
+                    foreach (var block in GroupRowsIntoAreas(candidateRows))
+                    {
+                        int bx0 = block.Min(r => r.PixelX);
+                        int by0 = block.Min(r => r.PixelY);
+                        int bx1 = block.Max(r => r.PixelX + r.PixelW);
+                        int by1 = block.Max(r => r.PixelY + r.PixelH);
+
+                        int bw = bx1 - bx0;
+                        int bh = by1 - by0;
+
+                        bool ok = LooksLikeTable(block, imgWidth, imgHeight);
+                        if (!ok)
+                            continue;
+
+                        write($"[TABLE-AREA] 表格块 行 {block.Count} / 列 {CountColumns(block)}"
+                              + $" / 对齐 {RowAlignment(block):0.00} / 行距 {RowPitchRegularity(block):0.00}"
+                              + $"  X {bx0}~{bx1}  Y {by0}~{by1}");
+
+                        areas.Add(new PageRect(bx0, by0, bw, bh));
+                    }
+
+                    write($"[INFO] 表格块检测：{areas.Count} 处表格 / 表題欄"
+                          + (areas.Count > 0 ? "（按块遮蔽，保留表格以外的零件视图）" : "（改用整列遮蔽）"));
+                }
+            }
+            catch (Exception ex)
+            {
+                write($"[WARN] 表格块检测失败（退回整列遮蔽）：{ex.Message}");
+                areas.Clear();
+            }
+
+            return areas;
+        }
+
+        /// <summary>
+        /// 只解析文字层，返回整页「文字行」的外接框（页面像素坐标）；不做归属、不改 <see cref="PartInfo"/>。
+        ///
+        /// 行的划分与 <see cref="BuildLines"/> 完全一致（同一套 Y 容差分组），
+        /// 所以这里的框就是 <c>parts_text.txt</c> 里那一行文字实际占的矩形。
+        ///
+        /// 用途：给 <see cref="PartDetector"/> 判「文字面积占比」用 —— 表題欄 / 変更履歴表这类
+        /// 表格的每一行都横跨单元格、行行相邻，行框几乎铺满整块；真正的零件视图里文字只是
+        /// 零散标注，行框占比很低。据此可在导出 PNG 之前把表格残片筛掉。
+        ///
+        /// 无文字层 / 解析失败时返回空列表（调用方跳过筛除，按原样输出）。
+        /// </summary>
+        public static List<PageRect> ReadTextLineBoxes(
+            string pdfPath, int pageIndex, int imgWidth, int imgHeight, Action<string> log)
+        {
+            Action<string> write = log ?? (_ => { });
+            var boxes = new List<PageRect>();
+
+            if (string.IsNullOrEmpty(pdfPath) || imgWidth <= 0 || imgHeight <= 0)
+                return boxes;
+
+            try
+            {
+                using (var doc = PdfDocument.Open(pdfPath))
+                {
+                    if (pageIndex < 0 || pageIndex >= doc.NumberOfPages)
+                        return boxes;
+
+                    var page = doc.GetPage(pageIndex + 1);   // PdfPig 页码从 1 开始
+                    if (page.Width <= 0 || page.Height <= 0)
+                        return boxes;
+
+                    int outside;
+                    var raw = ReadPageWords(page, page.Height,
+                                            imgWidth / page.Width, imgHeight / page.Height,
+                                            imgWidth, imgHeight, out outside);
+
+                    var texts = new List<PartText>(raw.Count);
+                    foreach (var w in raw)
+                        texts.Add(ToPartText(w, 1.0, 0, 0));   // mm 不参与计算，只取像素坐标
+
+                    foreach (var line in BuildLines(texts))
+                        boxes.Add(new PageRect(line.PixelX, line.PixelY, line.PixelW, line.PixelH));
+                }
+            }
+            catch (Exception ex)
+            {
+                write($"[WARN] 文字行读取失败（跳过「文字占比」筛除）：{ex.Message}");
+                boxes.Clear();
+            }
+
+            return boxes;
+        }
+
+        /// <summary>
+        /// 把「一行」按超大水平间隙拆成多段（相邻单元格间隙 &gt; max(120px, 8 倍字高)）。
+        ///
+        /// 必要性：同一 Y 位置上可能同时存在「左侧零件图的尺寸标注」与「右侧部品表」两处文字。
+        /// 行内按普通间隙（1 倍字高）拆格后它们会连成一整行，进而被当成一张跨页宽表 —— 遮蔽时
+        /// 连左侧零件图一起涂黑。先按超大间隙拆段再分块，两处各成一块，互不影响。
+        ///
+        /// 阈值取 8 倍字高：普通表格的列间隙（1~6 倍字高）不会被拆开，
+        /// 而不同区域之间通常隔着数百像素的空白。
+        /// </summary>
+        private static List<TableRow> SplitRowsByWideGaps(List<TableRow> rows)
+        {
+            var result = new List<TableRow>();
+            if (rows == null || rows.Count == 0)
+                return result;
+
+            foreach (var row in rows)
+            {
+                TableRow current = null;
+                int prevRight = int.MinValue;
+
+                foreach (var cell in row.Cells)
+                {
+                    double gapTol = Math.Max(120.0, cell.PixelH * 8.0);
+
+                    if (current == null || cell.PixelX - prevRight > gapTol)
+                    {
+                        current = new TableRow();
+                        result.Add(current);
+                    }
+
+                    current.Cells.Add(cell);
+                    prevRight = cell.PixelX + cell.PixelW;
+                }
+            }
+
+            foreach (var r in result)
+                RecalcRowBounds(r);
+
+            return result.OrderBy(r => r.PixelY).ThenBy(r => r.PixelX).ToList();
+        }
+
+        /// <summary>按单元格重算一行的外接框。</summary>
+        private static void RecalcRowBounds(TableRow row)
+        {
+            if (row == null || row.Cells.Count == 0)
+                return;
+
+            row.PixelX = row.Cells.Min(c => c.PixelX);
+            row.PixelY = row.Cells.Min(c => c.PixelY);
+            row.PixelW = row.Cells.Max(c => c.PixelX + c.PixelW) - row.PixelX;
+            row.PixelH = row.Cells.Max(c => c.PixelY + c.PixelH) - row.PixelY;
+        }
+
+        /// <summary>
+        /// 把「行」聚成候选块：与某个已有块的末行在纵向紧邻（间隙 ≤ max(60px, 1.5 倍行高)）、
+        /// 单元格数相差 ≤ 3、且横向范围重叠 ≥ 50% 即并入该块（取纵向距离最近的一块）。
+        /// 这里只是「候选」，是否真表格由 <see cref="LooksLikeTable"/> 判定。
+        /// </summary>
+        private static List<List<TableRow>> GroupRowsIntoAreas(List<TableRow> rows)
+        {
+            var groups = new List<List<TableRow>>();
+            if (rows == null || rows.Count == 0)
+                return groups;
+
+            foreach (var r in rows)
+            {
+                List<TableRow> best    = null;
+                double        bestDist = double.MaxValue;
+
+                foreach (var g in groups)
+                {
+                    TableRow prev   = g[g.Count - 1];
+                    double   gap    = r.PixelY - (prev.PixelY + prev.PixelH);
+                    double   rowH   = Math.Max(8.0, Math.Max(prev.PixelH, r.PixelH));
+                    double   gapTol = Math.Max(60.0, rowH * 1.5);
+
+                    if (Math.Abs(gap) > gapTol) continue;
+                    if (Math.Abs(r.Cells.Count - prev.Cells.Count) > 3) continue;
+                    if (XRangeOverlap(prev, r) < 0.5) continue;
+
+                    if (Math.Abs(gap) < bestDist)
+                    {
+                        bestDist = Math.Abs(gap);
+                        best     = g;
+                    }
+                }
+
+                if (best == null) groups.Add(new List<TableRow> { r });
+                else              best.Add(r);
+            }
+
+            return groups;
+        }
+
+        /// <summary>两行横向范围的交集 / 较窄者宽度（0~1）。</summary>
+        private static double XRangeOverlap(TableRow a, TableRow b)
+        {
+            int left   = Math.Max(a.PixelX, b.PixelX);
+            int right  = Math.Min(a.PixelX + a.PixelW, b.PixelX + b.PixelW);
+            int narrow = Math.Min(a.PixelW, b.PixelW);
+
+            if (right <= left || narrow <= 0)
+                return 0.0;
+
+            return (right - left) / (double)narrow;
+        }
+
+        /// <summary>
+        /// 判定一个候选块是否「表格 / 表題欄」。
+        ///
+        /// 关键是「多行 × 多列 + 列对齐」：图纸里的尺寸标注是沿引线排开的几个词，
+        /// 即使恰好凑成 3 行，各行的横向位置也互不对齐；表格每行的列位置几乎完全重合。
+        /// </summary>
+        private static bool LooksLikeTable(List<TableRow> rows, int imgWidth, int imgHeight)
+        {
+            if (rows == null || rows.Count < 2)
+                return false;
+
+            int wordCount = 0;
+            int charCount = 0;
+            foreach (var r in rows)
+            {
+                wordCount += r.Cells.Count;
+                foreach (var c in r.Cells)
+                    charCount += (c.Text ?? string.Empty).Trim().Length;
+            }
+
+            if (wordCount < TableAreaMinWords && charCount < TableAreaMinChars)
+                return false;
+
+            var cellCounts  = rows.Select(r => r.Cells.Count).OrderBy(n => n).ToList();
+            int medianCells = cellCounts[cellCounts.Count / 2];
+            int multiRows   = rows.Count(r => r.Cells.Count >= 3);
+            int columns     = CountColumns(rows);
+
+            if (columns < TableAreaMinCells)
+                return false;
+
+            int x0 = rows.Min(r => r.PixelX);
+            int y0 = rows.Min(r => r.PixelY);
+            int x1 = rows.Max(r => r.PixelX + r.PixelW);
+            int y1 = rows.Max(r => r.PixelY + r.PixelH);
+
+            int w = x1 - x0;
+            int h = y1 - y0;
+
+            if (w <= 0 || h <= 0)
+                return false;
+
+            double align = RowAlignment(rows);
+            double pitch = RowPitchRegularity(rows);
+
+            bool byRows  = rows.Count >= TableAreaMinRows
+                           && medianCells >= TableAreaMinCells
+                           && multiRows >= 2;
+            bool shortBy = rows.Count == 2 && columns >= TableAreaMinColumnsForShort;
+
+            // ③ 密集文本块：大量合并单元格的表格 / 标题栏（每行只有 1~2 格，列对不齐），
+            //    特征改为「行高等距 + 每行横向铺满 + 文字较多」。
+            bool denseBy = rows.Count >= TableAreaMinRows
+                           && pitch >= TableAreaMinPitchRegularity
+                           && charCount >= TableAreaMinChars
+                           && MedianRowWidth(rows) >= w * 0.5;
+
+            if (!byRows && !shortBy && !denseBy)
+                return false;
+
+            // 表格的结构证据（满足其一）：行间列对齐 / 行距规律
+            if (align < TableAreaMinAlign && pitch < TableAreaMinPitchRegularity)
+                return false;
+
+            if (w < imgWidth  * 0.04) return false;
+            if (h < imgHeight * 0.012) return false;
+            if ((double)w * h > imgWidth * (double)imgHeight * 0.45) return false;
+
+            return true;
+        }
+
+        /// <summary>各行宽度的中位数（用于判断「每行都横向铺满整块」的表題欄）。</summary>
+        private static double MedianRowWidth(List<TableRow> rows)
+        {
+            var widths = rows.Select(r => (double)r.PixelW).OrderBy(v => v).ToList();
+            return widths[widths.Count / 2];
+        }
+
+        /// <summary>
+        /// 用「中心 X」聚类估算列数（容差 max(16px, 0.6 倍平均字高)，与 <see cref="BuildColumns"/> 一致，
+        /// 但不改写单元格，供表格块判定使用）。
+        /// </summary>
+        private static int CountColumns(List<TableRow> rows)
+        {
+            var cells = new List<TableCell>();
+            foreach (var r in rows)
+                cells.AddRange(r.Cells);
+
+            if (cells.Count == 0)
+                return 0;
+
+            double avgH   = cells.Average(c => (double)c.PixelH);
+            double colTol = Math.Max(16.0, avgH * 0.6);
+
+            var centers = new List<double>();
+
+            foreach (var c in cells.OrderBy(c => c.PixelX + c.PixelW / 2.0))
+            {
+                double center = c.PixelX + c.PixelW / 2.0;
+                bool found = false;
+
+                foreach (double s in centers)
+                {
+                    if (Math.Abs(s - center) <= colTol) { found = true; break; }
+                }
+
+                if (!found) centers.Add(center);
+            }
+
+            return centers.Count;
+        }
+
+        /// <summary>
+        /// 行距规律性（0~1）：相邻行中心距落在「中位数 0.5~1.6 倍」范围内的比例。
+        ///
+        /// 表題欄这类大量合并单元格的表格，列位置对不齐（<see cref="RowAlignment"/> 很低），
+        /// 但行高等距、行距规整；散落的尺寸标注行距忽大忽小。
+        /// </summary>
+        private static double RowPitchRegularity(List<TableRow> rows)
+        {
+            if (rows == null || rows.Count < 3)
+                return 0.0;
+
+            var pitches = new List<double>();
+            for (int i = 1; i < rows.Count; i++)
+            {
+                double prevCenter = rows[i - 1].PixelY + rows[i - 1].PixelH / 2.0;
+                double curCenter  = rows[i].PixelY     + rows[i].PixelH     / 2.0;
+                double pitch      = Math.Abs(curCenter - prevCenter);
+                if (pitch > 0) pitches.Add(pitch);
+            }
+
+            if (pitches.Count < 2)
+                return 0.0;
+
+            var sorted = pitches.OrderBy(p => p).ToList();
+            double median = sorted[sorted.Count / 2];
+            if (median <= 0) return 0.0;
+
+            int ok = pitches.Count(p => p >= median * 0.5 && p <= median * 1.6);
+            return ok / (double)pitches.Count;
+        }
+
+        /// <summary>
+        /// 相邻行之间的列对齐率（0~1）：每行有多少比例的单元格中心能在上一行找到「对应列」。
+        /// 真表格接近 1；散落的尺寸标注很低。
+        /// </summary>
+        private static double RowAlignment(List<TableRow> rows)
+        {
+            if (rows.Count < 2)
+                return 0.0;
+
+            double total = 0.0;
+            int    pairs = 0;
+
+            for (int i = 1; i < rows.Count; i++)
+            {
+                TableRow prev = rows[i - 1];
+                TableRow cur  = rows[i];
+                if (prev.Cells.Count == 0 || cur.Cells.Count == 0)
+                    continue;
+
+                double avgH = (prev.Cells.Average(c => (double)c.PixelH)
+                               + cur.Cells.Average(c => (double)c.PixelH)) / 2.0;
+                double tol   = Math.Max(20.0, avgH * 0.8);
+                int    match = 0;
+
+                foreach (var c in cur.Cells)
+                {
+                    double center = c.PixelX + c.PixelW / 2.0;
+
+                    foreach (var p in prev.Cells)
+                    {
+                        if (Math.Abs(p.PixelX + p.PixelW / 2.0 - center) <= tol)
+                        {
+                            match++;
+                            break;
+                        }
+                    }
+                }
+
+                total += match / (double)cur.Cells.Count;
+                pairs++;
+            }
+
+            return pairs == 0 ? 0.0 : total / pairs;
         }
 
         /// <summary>

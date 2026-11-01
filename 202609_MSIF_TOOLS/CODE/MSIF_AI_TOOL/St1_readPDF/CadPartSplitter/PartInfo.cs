@@ -23,6 +23,9 @@ namespace CadPartSplitter
         public double PdfW_mm { get; set; }
         public double PdfH_mm { get; set; }
 
+        // ── 该零件图上的圈号标注（矢量圆 + 圈内数字；位图输入为空列表）──────
+        public List<Callout> Callouts { get; set; } = new List<Callout>();
+
         // ── 该零件图上的文字（位图输入无文字层时为空列表）──────────────────
         public List<PartText> Texts { get; set; } = new List<PartText>();
     }

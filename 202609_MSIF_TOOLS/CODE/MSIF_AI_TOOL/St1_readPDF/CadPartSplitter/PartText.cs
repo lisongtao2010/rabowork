@@ -15,6 +15,16 @@ namespace CadPartSplitter
         /// <summary>文字内容（按 PDF 词边界切分，已 Trim）。</summary>
         public string Text { get; set; }
 
+        /// <summary>
+        /// 该词若是「圈号标注」圈内的数字（①1、②2 …），这里存带圈的组合形式；其它词为 null。
+        ///
+        /// 只用于人眼可读的清单文件：列出文字时用它替代 <see cref="Text"/>，
+        /// 于是在**原位置**把裸数字换成带圈编号，同一行里其它相同数字（尺寸等）不受影响——
+        /// 回填依据是「词中心落在哪个圈里」（<see cref="CalloutExtractor.MarkCalloutWords"/>），
+        /// 不是字符串全局替换。词级真值仍是 <see cref="Text"/>，JSON 输出不变。
+        /// </summary>
+        public string CalloutDisplay { get; set; }
+
         // ── 页面绝对像素坐标 ────────────────────────────────────────────────
         public int PixelX { get; set; }
         public int PixelY { get; set; }
@@ -33,15 +43,20 @@ namespace CadPartSplitter
     }
 
     /// <summary>
-    /// 由若干 <see cref="PartText"/> 按「同一行」合并而成的可读文本行，
-    /// 只用于生成人眼可读的 <c>parts_text.txt</c>；JSON 里保存的仍是词级原始坐标。
+    /// <c>parts_text.txt</c> / <c>outside_text.txt</c> 里的一条文字记录及其坐标。
+    ///
+    /// 默认「一个词一行」（<see cref="PartTextExtractor.BuildWordLines"/>）：一条记录就是
+    /// 一个 PDF 词的紧贴外接框，文本也只含这一个词；
+    /// 加 <c>--merge-text-lines</c> 时是同一水平线上的若干词拼成一句、坐标为并集外框
+    /// （<see cref="PartTextExtractor.BuildLines"/>）。
+    /// 只用于人眼可读的 txt 清单；JSON 里保存的仍是词级原始坐标。
     /// </summary>
     public class PartTextLine
     {
-        /// <summary>整行文字（同一行内的词按 X 排序、按间距决定是否补空格）。</summary>
+        /// <summary>该条文字（逐词模式下就是单个词；合并模式下是整行，词间按间距补空格）。</summary>
         public string Text { get; set; }
 
-        // ── 该行所有词的并集外接框（页面绝对像素）──────────────────────────
+        // ── 该条文字的外接框（页面绝对像素；合并模式下为整行并集框）──────────
         public int PixelX { get; set; }
         public int PixelY { get; set; }
         public int PixelW { get; set; }
@@ -51,7 +66,7 @@ namespace CadPartSplitter
         public int LocalX { get; set; }
         public int LocalY { get; set; }
 
-        /// <summary>该行由多少个词合并而来。</summary>
+        /// <summary>该条由多少个词组成（逐词模式恒为 1，合并模式为整行的词数）。</summary>
         public int WordCount { get; set; }
     }
 
@@ -121,6 +136,34 @@ namespace CadPartSplitter
     }
 
     /// <summary>
+    /// 页面像素矩形（左上原点、Y 向下）。用它把「文字模块推断出的表格区域」
+    /// 传给「检测模块」做表格块遮蔽，避免两个模块互相依赖。
+    /// </summary>
+    public struct PageRect
+    {
+        public int X { get; set; }
+        public int Y { get; set; }
+        public int W { get; set; }
+        public int H { get; set; }
+
+        public PageRect(int x, int y, int w, int h)
+        {
+            X = x;
+            Y = y;
+            W = w;
+            H = h;
+        }
+
+        public int Right  { get { return X + W; } }
+        public int Bottom { get { return Y + H; } }
+
+        public override string ToString()
+        {
+            return "x=" + X + " y=" + Y + " w=" + W + " h=" + H;
+        }
+    }
+
+    /// <summary>
     /// 一次「PDF 文字层」读取的完整结果：零件框内的词已写回 <see cref="PartInfo.Texts"/>，
     /// 零件框以外的词分为「表格 / 标题栏区」与「其它未归属」两组，表格部分另给出行列结构。
     /// </summary>
@@ -146,6 +189,13 @@ namespace CadPartSplitter
 
         /// <summary>表格区按行 / 单元格组织后的结构。</summary>
         public List<TableBlock> Tables { get; set; } = new List<TableBlock>();
+
+        /// <summary>
+        /// 该页识别到的全部圈号标注（矢量圆 + 圈内数字，如 ①1）。
+        /// 归属零件的记录同时写回 <see cref="PartInfo.Callouts"/>，这里保留全页顺序清单，
+        /// 便于输出「不按零件分组」的总表与核对没被任何零件图覆盖的编号。
+        /// </summary>
+        public List<Callout> Callouts { get; set; } = new List<Callout>();
 
         /// <summary>零件框以外的词总数。</summary>
         public int OutsideWordCount
