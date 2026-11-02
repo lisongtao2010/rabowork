@@ -8,7 +8,7 @@ using System.Text.RegularExpressions;
 namespace MSIFAITOOLS.Services
 {
     /// <summary>
-    /// *_xy.txt 中的一行文字及其坐标。
+    /// xy.txt 中的一行文字及其坐标。
     /// 坐标系与 PdfTextExtractor 输出一致：原点在页面左上角、Y 轴向下。
     /// </summary>
     internal sealed class XyWord
@@ -59,7 +59,7 @@ namespace MSIFAITOOLS.Services
     }
 
     /// <summary>
-    /// *_xy.txt（文字 + 坐标）的只读索引，用于校验 AI 提取的部品名 / 部品コード
+    /// xy.txt（文字 + 坐标）的只读索引，用于校验 AI 提取的部品名 / 部品コード
     /// 是否真实出现在图纸上，并可为 AI 生成“该页有哪些文字”的辅助片段。
     /// </summary>
     internal sealed class XyCoordinateIndex
@@ -95,9 +95,9 @@ namespace MSIFAITOOLS.Services
         public int WordCount { get; private set; }
 
         /// <summary>
-        /// 解析指定的 *_xy.txt。
+        /// 解析指定的 xy.txt。
         /// </summary>
-        /// <param name="xyFilePath">*_xy.txt 的完整路径。</param>
+        /// <param name="xyFilePath">xy.txt 的完整路径。</param>
         /// <exception cref="FileNotFoundException">文件不存在。</exception>
         public static XyCoordinateIndex Load(string xyFilePath)
         {

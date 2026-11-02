@@ -6,7 +6,7 @@ using System.Text.RegularExpressions;
 
 namespace MSIFAITOOLS.Services
 {
-    /// <summary>*_plu_table.txt 中的一页。</summary>
+    /// <summary>plu_table.txt 中的一页。</summary>
     internal sealed class PluTablePage
     {
         public PluTablePage(int pageNumber, string body)
@@ -33,7 +33,7 @@ namespace MSIFAITOOLS.Services
     }
 
     /// <summary>
-    /// *_plu_table.txt（由 PdfTextExtractor 生成，页标题为 “--- 第 N 页 ---”，
+    /// plu_table.txt（由 PdfTextExtractor 生成，页标题为 “--- 第 N 页 ---”，
     /// 表格块为 “[表格 N]” + “| 单元格 | ...” 行）的页级切分与片段提取。
     /// 用于给 AI 准备“只含目标表格页”的输入，避免整份文档超出上下文。
     /// </summary>

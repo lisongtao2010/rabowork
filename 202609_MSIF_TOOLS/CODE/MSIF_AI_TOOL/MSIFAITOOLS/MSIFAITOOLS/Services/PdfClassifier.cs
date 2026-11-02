@@ -186,18 +186,18 @@ namespace MSIFAITOOLS.Services
 
         /// <summary>对文件夹内（第一层）所有 PDF 分类。</summary>
         /// <param name="folder">PDF 所在文件夹。</param>
-        /// <param name="pluDirectory">plu 输出目录（&lt;文件夹&gt;\AppData\plu）。</param>
-        public static IList<PdfClassification> ClassifyFolder(string folder, string pluDirectory)
+        /// <param name="outputRoot">分解输出根目录（&lt;文件夹&gt;\AiAppData）。</param>
+        public static IList<PdfClassification> ClassifyFolder(string folder, string outputRoot)
         {
-            return ClassifyFiles(folder, PdfSplitService.FindPdfFiles(folder), pluDirectory);
+            return ClassifyFiles(folder, PdfSplitService.FindPdfFiles(folder), outputRoot);
         }
 
         /// <summary>对指定的 PDF 文件集合分类。</summary>
         /// <param name="folder">PDF 所在文件夹（pdfNames 为完整路径时可为 null）。</param>
         /// <param name="pdfNames">PDF 文件名或完整路径集合。</param>
-        /// <param name="pluDirectory">plu 输出目录。</param>
+        /// <param name="outputRoot">分解输出根目录。</param>
         public static IList<PdfClassification> ClassifyFiles(string folder, IEnumerable<string> pdfNames,
-            string pluDirectory)
+            string outputRoot)
         {
             List<PdfClassification> items = new List<PdfClassification>();
 
@@ -217,7 +217,7 @@ namespace MSIFAITOOLS.Services
                     ? name
                     : Path.Combine(folder, name);
 
-                items.Add(Classify(path, pluDirectory));
+                items.Add(Classify(path, outputRoot));
             }
 
             return items;
@@ -225,8 +225,8 @@ namespace MSIFAITOOLS.Services
 
         /// <summary>对单个 PDF 分类。</summary>
         /// <param name="pdfFilePath">PDF 文件的完整路径。</param>
-        /// <param name="pluDirectory">plu 输出目录（U 分支判定 plu_all 时使用）。</param>
-        public static PdfClassification Classify(string pdfFilePath, string pluDirectory)
+        /// <param name="outputRoot">分解输出根目录（U 分支判定 plu_all 时使用）。</param>
+        public static PdfClassification Classify(string pdfFilePath, string outputRoot)
         {
             if (string.IsNullOrWhiteSpace(pdfFilePath))
             {
@@ -253,7 +253,7 @@ namespace MSIFAITOOLS.Services
                     return new PdfClassification(pdfFilePath, PdfCategory.Machining, "文件名第 5 个字符为 C", true);
 
                 case 'U':
-                    return ClassifyByPluAll(pdfFilePath, stem, pluDirectory);
+                    return ClassifyByPluAll(pdfFilePath, stem, outputRoot);
 
                 default:
                     return new PdfClassification(pdfFilePath, PdfCategory.Unknown,
@@ -262,15 +262,16 @@ namespace MSIFAITOOLS.Services
         }
 
         /// <summary>U 分支：在 plu_all 中找含文件名的行，按上一行的关键字判定。</summary>
-        private static PdfClassification ClassifyByPluAll(string pdfFilePath, string stem, string pluDirectory)
+        private static PdfClassification ClassifyByPluAll(string pdfFilePath, string stem, string outputRoot)
         {
-            if (string.IsNullOrWhiteSpace(pluDirectory))
+            if (string.IsNullOrWhiteSpace(outputRoot))
             {
                 return new PdfClassification(pdfFilePath, PdfCategory.Unknown,
-                    "未提供 plu 目录，无法按 plu_all 判定", true);
+                    "未提供分解输出目录，无法按 plu_all 判定", true);
             }
 
-            string pluAllPath = Path.Combine(pluDirectory, stem + PdfSplitService.PluAllFileSuffix);
+            string pluAllPath = Path.Combine(PdfSplitService.GetPdfOutputDirectory(outputRoot, stem),
+                PdfSplitService.PluAllFileName);
             string pluAllName = Path.GetFileName(pluAllPath);
 
             if (!File.Exists(pluAllPath))
@@ -415,7 +416,7 @@ namespace MSIFAITOOLS.Services
         /// 文件不存在、读取失败或内容为空时返回 null，由调用方回退到重新分类。
         /// </summary>
         /// <param name="folder">PDF 所在文件夹（用于还原每个条目的完整路径）。</param>
-        /// <param name="classifyDirectory">分类结果目录（&lt;文件夹&gt;\AppData\classify）。</param>
+        /// <param name="classifyDirectory">分类结果目录（&lt;文件夹&gt;\AiAppData\classify）。</param>
         public static IList<PdfClassification> LoadSummary(string folder, string classifyDirectory)
         {
             if (string.IsNullOrWhiteSpace(folder) || string.IsNullOrWhiteSpace(classifyDirectory))

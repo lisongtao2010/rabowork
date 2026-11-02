@@ -13,6 +13,7 @@ namespace MSIFAITOOLS
 {
     public partial class Form1 : Form
     {
+        /// <summary>最近一次分解的输出根目录（&lt;PDF 文件夹&gt;\AiAppData，其下每个 PDF 一个「図番号」子文件夹）。</summary>
         private string _lastOutputDir;
 
         private string _classifyDirectory;
@@ -28,11 +29,8 @@ namespace MSIFAITOOLS
         /// <summary>【AI 分析】按钮的初始文字（运行中显示“分析中...”）。</summary>
         private string _aiButtonText;
 
-        /// <summary>最近一次分解的坐标目录（&lt;PDF 文件夹&gt;\xy）。</summary>
-        private string _lastXyDirectory;
-
-        /// <summary>最近一次分解的 plu 目录（&lt;PDF 文件夹&gt;\plu，含 *_plu_table.txt）。</summary>
-        private string _lastPluDirectory;
+        /// <summary>【CMD 分析】按钮的初始文字（运行中显示“分析中...”）。</summary>
+        private string _cmdButtonText;
 
         /// <summary>PDF 预览窗口（非模态，选中分类列表行时复用同一个窗口）。</summary>
         private PdfPreviewForm _previewForm;
@@ -52,6 +50,7 @@ namespace MSIFAITOOLS
             InitializeClassifyGrid();
             _startButtonText = btnStart.Text;
             _aiButtonText = btnAiAnalyze.Text;
+            _cmdButtonText = btnCmdAnalyze.Text;
         }
 
         /// <summary>
@@ -214,11 +213,14 @@ namespace MSIFAITOOLS
 
             btnStart.Enabled = !running;
             btnAiAnalyze.Enabled = !running;
+            btnCmdAnalyze.Enabled = !running;
             btnAiSettings.Enabled = !running;
             btnBrowse.Enabled = !running;
             txtFolder.Enabled = !running;
+            chkCadSplit.Enabled = !running;
             btnStart.Text = running ? "分解中..." : _startButtonText;
             btnAiAnalyze.Text = running ? "分析中..." : _aiButtonText;
+            btnCmdAnalyze.Text = running ? "分析中..." : _cmdButtonText;
 
             if (running)
             {
@@ -291,7 +293,89 @@ namespace MSIFAITOOLS
         }
 
         /// <summary>
-        /// 开始分解：调用内置 .NET PDF 引擎（PdfPig）批量处理文件夹内所有 PDF。
+        /// 第 1 步：调用外部程序 CadPartSplitter（x64）批量分割本文件夹内的 PDF，
+        /// 结果写入 &lt;PDF 文件夹&gt;\AiAppData\&lt;図番号&gt;\（Part_NN.png / parts_info.json / parts_text.txt 等），
+        /// 与本工具随后生成的 xy.txt / table.txt / plu_*.txt 位于同一子文件夹、互不覆盖。
+        ///
+        /// 未勾选、找不到程序或分割失败时只记录警告，不阻断第 2 步（本工具自身的分解）。
+        /// 注意：本方法在后台线程执行（由 BtnStart_Click 的 Task.Run 调用），
+        /// 界面刷新走 AppendLog / SetStatus / RunOnUi，它们内部已处理线程切换。
+        /// </summary>
+        /// <param name="folder">PDF 所在文件夹。</param>
+        private void RunCadPartSplitterStep(string folder)
+        {
+            AppendLog("--------------------------------------------------", Color.FromArgb(90, 90, 90));
+
+            if (chkCadSplit != null && !chkCadSplit.Checked)
+            {
+                AppendLog("已按设置跳过 CadPartSplitter 零件分割。", Color.FromArgb(255, 200, 120));
+                return;
+            }
+
+            AppendLog("第 1 步：调用 CadPartSplitter 做零件分割", Color.FromArgb(120, 200, 255));
+            SetStatus("正在执行 CadPartSplitter 零件分割...", Color.FromArgb(230, 126, 34));
+            RunOnUi(delegate { lblProgress.Text = "CadPartSplitter 分割中..."; });
+
+            CadPartSplitResult cadResult = CadPartSplitterRunner.RunBatch(folder, AppendCadSplitLog);
+
+            if (!cadResult.ExeFound)
+            {
+                AppendLog("已跳过 CadPartSplitter 零件分割：" + cadResult.ErrorMessage,
+                    Color.FromArgb(255, 200, 120));
+                return;
+            }
+
+            AppendLog("调用程序：" + cadResult.ExePath, Color.FromArgb(180, 180, 180));
+            AppendLog("CadPartSplitter 耗时 " + (cadResult.ElapsedMilliseconds / 1000.0).ToString("0.0") + " 秒",
+                Color.FromArgb(180, 180, 180));
+
+            if (cadResult.Success)
+            {
+                AppendLog(string.IsNullOrEmpty(cadResult.Summary)
+                        ? "CadPartSplitter 零件分割完成。"
+                        : "CadPartSplitter 零件分割完成：" + cadResult.Summary,
+                    Color.FromArgb(150, 220, 150));
+                return;
+            }
+
+            AppendLog("CadPartSplitter 未全部成功：" + cadResult.ErrorMessage, Color.FromArgb(255, 200, 120));
+
+            if (!string.IsNullOrEmpty(cadResult.OutputTail))
+            {
+                AppendLog("CadPartSplitter 输出末尾：" + Environment.NewLine + cadResult.OutputTail,
+                    Color.FromArgb(255, 200, 120));
+            }
+
+            AppendLog("继续执行第 2 步（本工具的 PDF 分解）。", Color.FromArgb(255, 200, 120));
+        }
+
+        /// <summary>
+        /// CadPartSplitter 的逐行输出回调（来自后台线程），统一加上 [CAD] 前缀以便与本工具日志区分。
+        /// </summary>
+        private void AppendCadSplitLog(string line)
+        {
+            if (string.IsNullOrEmpty(line))
+            {
+                return;
+            }
+
+            AppendLog("[CAD] " + line, Color.FromArgb(170, 190, 210));
+        }
+
+        /// <summary>
+        /// 第 2 步开始前刷新界面：把进度显示从 CadPartSplitter 阶段切回本工具的分解。
+        /// </summary>
+        /// <param name="pdfCount">待处理的 PDF 数量。</param>
+        private void ReportLocalSplitStart(int pdfCount)
+        {
+            AppendLog("第 2 步：执行 MSIF AI TOOLS 自身的 PDF 分解（" + pdfCount + " 个 PDF）",
+                Color.FromArgb(120, 200, 255));
+            SetStatus("正在分解（共 " + pdfCount + " 个 PDF）...", Color.FromArgb(230, 126, 34));
+            RunOnUi(delegate { lblProgress.Text = "正在分解，请稍候..."; });
+        }
+
+        /// <summary>
+        /// 开始分解：先调用 CadPartSplitter 做零件分割，再调用内置 .NET PDF 引擎（PdfPig）批量处理文件夹内所有 PDF。
         /// </summary>
         private async void BtnStart_Click(object sender, EventArgs e)
         {
@@ -375,6 +459,14 @@ namespace MSIFAITOOLS
                 // 进度与日志回调都改用本窗体的普通方法，便于单步跟踪。
                 Func<PdfSplitResult> splitWork = delegate
                 {
+                    // 第 1 步：先调用 CadPartSplitter 做零件分割（Part_NN.png / parts_info.json 等），
+                    // 结果落在同一个 <PDF 文件夹>\AiAppData\<図番号> 下，与本工具的 txt 结果互不覆盖。
+                    // 找不到程序或分割失败只记警告，不阻断第 2 步。
+                    RunCadPartSplitterStep(folder);
+
+                    // 第 2 步：本工具自身的分解（xy / table / plu 等文本结果）
+                    ReportLocalSplitStart(pdfFiles.Length);
+
                     return service.Split(folder, OnSplitProgress, OnServiceLog);
                 };
 
@@ -404,12 +496,8 @@ namespace MSIFAITOOLS
                 return;
             }
 
-            string xyDir = result.XyDirectory;
-            string tableDir = result.TableDirectory;
-            string pluDir = result.PluDirectory;
-            _lastOutputDir = xyDir;
-            _lastXyDirectory = xyDir;
-            _lastPluDirectory = pluDir;
+            string outputDir = result.OutputDirectory;
+            _lastOutputDir = outputDir;
 
             // 分类结果：分解后由 PdfSplitService 按规则自动判定，未知项在【分类结果】页由用户选择
             _classifyDirectory = result.ClassifyDirectory;
@@ -427,9 +515,9 @@ namespace MSIFAITOOLS
             if (!result.HasErrors)
             {
                 AppendLog("全部处理成功，共 " + result.Total + " 个 PDF。", Color.FromArgb(150, 220, 150));
-                AppendLog("坐标输出：" + xyDir, Color.FromArgb(180, 180, 180));
-                AppendLog("表格输出：" + tableDir, Color.FromArgb(180, 180, 180));
-                AppendLog("plu 输出：" + pluDir, Color.FromArgb(180, 180, 180));
+                AppendLog("输出根目录：" + outputDir, Color.FromArgb(180, 180, 180));
+                AppendLog("每个 PDF 的子目录：" + outputDir + Path.DirectorySeparatorChar + "<図番号>",
+                    Color.FromArgb(180, 180, 180));
                 AppendLog("分类输出：" + _classifyDirectory, Color.FromArgb(180, 180, 180));
                 AppendLog("分类统计：" + PdfClassifier.BuildSummaryText(result.Classifications),
                     unknownCount > 0 ? Color.FromArgb(255, 200, 120) : Color.FromArgb(150, 220, 150));
@@ -441,9 +529,10 @@ namespace MSIFAITOOLS
 
                 MessageBox.Show(this,
                     "批量分解成功！\n\n共处理 " + result.Total + " 个 PDF\n\n" +
-                    "坐标文件（*_xy.txt / *_xy_imgtext.txt）：\n" + xyDir + "\n\n" +
-                    "表格文件（*_table.txt）：\n" + tableDir + "\n\n" +
-                    "plu 文件（*_plu_text / _plu_layout / _plu_table / _plu_image / _plu_all）：\n" + pluDir + "\n\n" +
+                    "输出根目录（每个 PDF 一个以図番号命名的子文件夹）：\n" + outputDir + "\n\n" +
+                    "各 PDF 子文件夹中的文件：\n" +
+                    "xy.txt / xy_imgtext.txt / table.txt /\n" +
+                    "plu_text.txt / plu_layout.txt / plu_table.txt / plu_image.txt / plu_all.txt\n\n" +
                     "分类结果（classification.csv）：\n" + _classifyDirectory + "\n\n" +
                     PdfClassifier.BuildSummaryText(result.Classifications) +
                     (unknownCount > 0
@@ -485,16 +574,10 @@ namespace MSIFAITOOLS
         /// <param name="pdfFiles">该文件夹中的 PDF 文件名（含扩展名）。</param>
         private void UseExistingSplitResult(string folder, string[] pdfFiles)
         {
-            string xyDir;
-            string tableDir;
-            string pluDir;
-            string classifyDir;
-            PdfSplitService.GetOutputDirectories(folder, out xyDir, out tableDir, out pluDir,
-                out classifyDir);
+            string outputRoot = PdfSplitService.GetOutputRoot(folder);
+            string classifyDir = PdfSplitService.GetClassifyDirectory(outputRoot);
 
-            _lastOutputDir = xyDir;
-            _lastXyDirectory = xyDir;
-            _lastPluDirectory = pluDir;
+            _lastOutputDir = outputRoot;
             _classifyDirectory = classifyDir;
 
             lblPdfInfo.Text = "PDF：" + pdfFiles.Length + " 个";
@@ -504,7 +587,7 @@ namespace MSIFAITOOLS
 
             if (!MatchesPdfFiles(items, pdfFiles))
             {
-                items = PdfClassifier.ClassifyFiles(folder, pdfFiles, pluDir);
+                items = PdfClassifier.ClassifyFiles(folder, pdfFiles, outputRoot);
             }
 
             PopulateClassification(items);
@@ -519,9 +602,7 @@ namespace MSIFAITOOLS
             AppendLog("--------------------------------------------------", Color.FromArgb(90, 90, 90));
             AppendLog("已跳过重新分解：直接使用现有分解结果（" + pdfFiles.Length + " 个 PDF）",
                 Color.FromArgb(150, 220, 150));
-            AppendLog("坐标目录：" + xyDir, Color.FromArgb(180, 180, 180));
-            AppendLog("表格目录：" + tableDir, Color.FromArgb(180, 180, 180));
-            AppendLog("plu 目录：" + pluDir, Color.FromArgb(180, 180, 180));
+            AppendLog("输出根目录：" + outputRoot, Color.FromArgb(180, 180, 180));
             AppendLog("分类结果：" + Path.Combine(classifyDir, PdfClassifier.SummaryFileName),
                 Color.FromArgb(180, 180, 180));
             AppendLog("分类统计：" + PdfClassifier.BuildSummaryText(items),
@@ -603,8 +684,8 @@ namespace MSIFAITOOLS
 
         /// <summary>
         /// AI 分析：遍历【分类结果】中「アッセンブリ図」的 PDF，
-        /// 用 AI 解析 *_plu_table.txt 提取【部品基本信息列表】，
-        /// 以 *_xy.txt 校验后登录到 SQLite 的部品基本信息表。
+        /// 用 AI 解析 plu_table.txt（&lt;输出根目录&gt;\&lt;図番号&gt;\）提取【部品基本信息列表】，
+        /// 以 xy.txt 校验后登录到 SQLite 的部品基本信息表。
         /// </summary>
         private async void BtnAiAnalyze_Click(object sender, EventArgs e)
         {
@@ -621,14 +702,14 @@ namespace MSIFAITOOLS
                 return;
             }
 
-            string pluDir = _lastPluDirectory;
+            string outputDir = _lastOutputDir;
 
-            if (string.IsNullOrEmpty(pluDir) || !Directory.Exists(pluDir))
+            if (string.IsNullOrEmpty(outputDir) || !Directory.Exists(outputDir))
             {
                 MessageBox.Show(this,
-                    "找不到 plu 输出目录，请先执行【开始分解】。\n\n" + (pluDir ?? string.Empty),
+                    "找不到分解输出目录，请先执行【开始分解】。\n\n" + (outputDir ?? string.Empty),
                     "提示", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                SetStatus("找不到 plu 输出目录", Color.FromArgb(239, 108, 0));
+                SetStatus("找不到分解输出目录", Color.FromArgb(239, 108, 0));
                 return;
             }
 
@@ -718,9 +799,7 @@ namespace MSIFAITOOLS
             AppendLog(string.Format("AI 分析开始：{0} 个「{1}」PDF", snapshot.Count,
                 PdfCategoryNames.Assembly), Color.FromArgb(120, 200, 255));
             AppendLog("AI 配置：" + options.Describe(), Color.FromArgb(180, 180, 180));
-            AppendLog("表格目录：" + pluDir, Color.FromArgb(180, 180, 180));
-            AppendLog("坐标目录：" + (string.IsNullOrEmpty(_lastXyDirectory) ? "（无）" : _lastXyDirectory),
-                Color.FromArgb(180, 180, 180));
+            AppendLog("分解输出目录：" + outputDir, Color.FromArgb(180, 180, 180));
 
             if (PartAnalysisService.IsDebugSingleFileMode)
             {
@@ -733,7 +812,6 @@ namespace MSIFAITOOLS
 
             PartAnalysisSummary summary = null;
             Exception failure = null;
-            string xyDir = _lastXyDirectory;
 
             try
             {
@@ -743,7 +821,7 @@ namespace MSIFAITOOLS
                 // 同上：用匿名方法（delegate）代替 Lambda 表达式，日志回调复用 OnServiceLog
                 Func<PartAnalysisSummary> analyzeWork = delegate
                 {
-                    return service.AnalyzeAndSave(snapshot, xyDir, pluDir, OnServiceLog);
+                    return service.AnalyzeAndSave(snapshot, outputDir, OnServiceLog);
                 };
 
                 summary = await Task.Run(analyzeWork);
@@ -790,6 +868,140 @@ namespace MSIFAITOOLS
 
             MessageBox.Show(this,
                 "AI 分析完成！\n\n" + summaryText + "\n\n" +
+                "部品基本信息数据库：\n" + summary.DatabasePath + "\n\n" +
+                "可在【分类结果】选中 PDF 行后点击【部品信息】查看登录的部品基本信息。",
+                "完成", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+        /// <summary>
+        /// 【CMD 分析】遍历【分类结果】中「アッセンブリ図」的 PDF，
+        /// 用本工具自己的逻辑（<b>不调用 AI</b>）读取 CadPartSplitter 生成的
+        /// LT_STEP1.csv（&lt;输出根目录&gt;\&lt;図番号&gt;\LT_STEP1.csv），
+        /// 以 xy.txt 校验后登录到与【AI 分析】相同的 SQLite 表。
+        /// 登录后可在【分类结果】选中 PDF 行 →【部品信息】查看明细。
+        /// </summary>
+        private async void BtnCmdAnalyze_Click(object sender, EventArgs e)
+        {
+            if (_isRunning)
+            {
+                return;
+            }
+
+            if (_classifications == null || _classifications.Count == 0)
+            {
+                MessageBox.Show(this, "请先点击【开始分解】，并在【分类结果】页确认分类后再执行 CMD 分析。",
+                    "提示", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                SetStatus("尚未分解，无法 CMD 分析", Color.FromArgb(239, 108, 0));
+                return;
+            }
+
+            string outputDir = _lastOutputDir;
+
+            if (string.IsNullOrEmpty(outputDir) || !Directory.Exists(outputDir))
+            {
+                MessageBox.Show(this,
+                    "找不到分解输出目录，请先执行【开始分解】。\n\n" + (outputDir ?? string.Empty),
+                    "提示", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                SetStatus("找不到分解输出目录", Color.FromArgb(239, 108, 0));
+                return;
+            }
+
+            // 后台线程只读快照，避免分析期间界面修改分类造成并发问题
+            List<PdfClassification> snapshot = new List<PdfClassification>();
+
+            foreach (PdfClassification item in _classifications)
+            {
+                if (item != null && item.Category == PdfCategory.Assembly)
+                {
+                    snapshot.Add(new PdfClassification(item.FilePath, item.Category, item.Evidence,
+                        item.IsAutomatic));
+                }
+            }
+
+            if (snapshot.Count == 0)
+            {
+                MessageBox.Show(this,
+                    "【分类结果】中没有「" + PdfCategoryNames.Assembly + "」的 PDF。\n\n" +
+                    "请在【分类结果】页确认分类（未知项可在下拉框中选择）后再执行。",
+                    "提示", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                SetStatus("没有「" + PdfCategoryNames.Assembly + "」，无需分析", Color.FromArgb(239, 108, 0));
+                return;
+            }
+
+            progressBar.Style = ProgressBarStyle.Continuous;
+            progressBar.Value = 0;
+
+            SetRunning(true);
+            tabMain.SelectedTab = tabPageLog;
+
+            AppendLog("==================================================", Color.FromArgb(90, 90, 90));
+            AppendLog(string.Format("CMD 分析开始：{0} 个「{1}」PDF（不调用 AI，直接读 LT_STEP1.csv）",
+                snapshot.Count, PdfCategoryNames.Assembly), Color.FromArgb(120, 200, 255));
+            AppendLog("分解输出目录：" + outputDir, Color.FromArgb(180, 180, 180));
+            AppendLog("部品基本信息数据库：" + PartBasicInfoRepository.ResolveDatabasePath(),
+                Color.FromArgb(180, 180, 180));
+
+            SetStatus("正在 CMD 分析（共 " + snapshot.Count + " 个 PDF）...", Color.FromArgb(230, 126, 34));
+            lblProgress.Text = "CMD 分析中...";
+
+            PartAnalysisSummary summary = null;
+            Exception failure = null;
+
+            try
+            {
+                CmdPartAnalysisService service =
+                    new CmdPartAnalysisService(PartBasicInfoRepository.ResolveDatabasePath());
+
+                // 后台线程执行：用匿名方法（delegate）代替 Lambda 表达式
+                Func<PartAnalysisSummary> analyzeWork = delegate
+                {
+                    return service.AnalyzeAndSave(snapshot, outputDir, OnServiceLog);
+                };
+
+                summary = await Task.Run(analyzeWork);
+            }
+            catch (Exception ex)
+            {
+                failure = ex;
+            }
+
+            SetRunning(false);
+
+            if (failure != null)
+            {
+                AppendLog("CMD 分析失败：" + failure.Message, Color.FromArgb(255, 140, 140));
+                SetStatus("CMD 分析异常", Color.FromArgb(198, 40, 40));
+                lblProgress.Text = "CMD 分析异常";
+                MessageBox.Show(this, "CMD 分析失败：\n" + failure.Message, "异常",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            if (summary == null)
+            {
+                SetStatus("CMD 分析未返回结果", Color.FromArgb(198, 40, 40));
+                lblProgress.Text = "CMD 分析未返回结果";
+                return;
+            }
+
+            string summaryText = CmdPartAnalysisService.BuildSummaryText(summary);
+
+            progressBar.Style = ProgressBarStyle.Continuous;
+            progressBar.Value = summary.SavedRowCount > 0 ? progressBar.Maximum : 0;
+            lblProgress.Text = "CMD 分析完成";
+
+            AppendLog("--------------------------------------------------", Color.FromArgb(90, 90, 90));
+            AppendLog(summaryText, summary.SavedRowCount > 0
+                ? Color.FromArgb(150, 220, 150)
+                : Color.FromArgb(255, 200, 120));
+            AppendLog("部品基本信息数据库：" + summary.DatabasePath, Color.FromArgb(180, 180, 180));
+
+            SetStatus(summaryText, summary.FailedFileCount > 0
+                ? Color.FromArgb(255, 140, 140)
+                : Color.FromArgb(46, 125, 50));
+
+            MessageBox.Show(this,
+                "CMD 分析完成！\n\n" + summaryText + "\n\n" +
                 "部品基本信息数据库：\n" + summary.DatabasePath + "\n\n" +
                 "可在【分类结果】选中 PDF 行后点击【部品信息】查看登录的部品基本信息。",
                 "完成", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -1353,7 +1565,7 @@ namespace MSIFAITOOLS
         }
 
         /// <summary>
-        /// 打开分类结果目录（&lt;PDF 文件夹&gt;\AppData\classify）。
+        /// 打开分类结果目录（&lt;PDF 文件夹&gt;\AiAppData\classify）。
         /// </summary>
         private void BtnOpenClassifyDir_Click(object sender, EventArgs e)
         {
@@ -1365,8 +1577,7 @@ namespace MSIFAITOOLS
 
                 if (folder.Length > 0 && Directory.Exists(folder))
                 {
-                    target = Path.Combine(folder, PdfSplitService.OutputRootFolderName,
-                        PdfClassifier.ClassifyFolderName);
+                    target = PdfSplitService.GetClassifyDirectory(PdfSplitService.GetOutputRoot(folder));
                 }
             }
 
@@ -1402,8 +1613,8 @@ namespace MSIFAITOOLS
                 string folder = txtFolder.Text.Trim();
                 if (folder.Length > 0 && Directory.Exists(folder))
                 {
-                    // 优先打开分解输出的根目录（<PDF 文件夹>\AppData）
-                    string outputRoot = Path.Combine(folder, PdfSplitService.OutputRootFolderName);
+                    // 优先打开分解输出的根目录（<PDF 文件夹>\AiAppData）
+                    string outputRoot = PdfSplitService.GetOutputRoot(folder);
                     target = Directory.Exists(outputRoot) ? outputRoot : folder;
                 }
             }

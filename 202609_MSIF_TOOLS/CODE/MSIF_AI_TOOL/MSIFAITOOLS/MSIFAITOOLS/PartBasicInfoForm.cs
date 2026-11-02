@@ -258,7 +258,10 @@ namespace MSIFAITOOLS
             dgvParts.Columns.Add(column);
         }
 
-        /// <summary>「追加行」：在表格末尾追加一行（页码沿用最后一行，番号取其下一个）。</summary>
+        /// <summary>
+        /// 「追加行」：在当前选中行的下方插入一行（未选中任何行时追加到表格末尾）。
+        /// 页码沿用插入点上一行，番号取其下一个。
+        /// </summary>
         private void BtnAddRow_Click(object sender, EventArgs e)
         {
             if (_drawingNo.Length == 0)
@@ -270,23 +273,25 @@ namespace MSIFAITOOLS
 
             dgvParts.EndEdit();
 
+            // 插入位置 = 选中行（多选时取最靠下的行）的下一行；没有选中行时插到末尾
+            DataGridViewRow anchor = GetInsertAnchorRow();
+            int insertIndex = anchor == null ? dgvParts.Rows.Count : anchor.Index + 1;
             int page = 1;
             int number = 1;
 
-            if (dgvParts.Rows.Count > 0)
+            if (anchor != null)
             {
-                DataGridViewRow last = dgvParts.Rows[dgvParts.Rows.Count - 1];
-                int lastPage;
-                int lastNumber;
+                int anchorPage;
+                int anchorNumber;
 
-                if (int.TryParse(GetCellText(last, "colPage"), out lastPage) && lastPage > 0)
+                if (int.TryParse(GetCellText(anchor, "colPage"), out anchorPage) && anchorPage > 0)
                 {
-                    page = lastPage;
+                    page = anchorPage;
                 }
 
-                if (int.TryParse(GetCellText(last, "colNumber"), out lastNumber) && lastNumber > 0)
+                if (int.TryParse(GetCellText(anchor, "colNumber"), out anchorNumber) && anchorNumber > 0)
                 {
-                    number = lastNumber + 1;
+                    number = anchorNumber + 1;
                 }
             }
 
@@ -298,8 +303,8 @@ namespace MSIFAITOOLS
                 dgvParts.Visible = true;
                 lblEmpty.Visible = false;
 
-                int rowIndex = dgvParts.Rows.Add(
-                    (dgvParts.Rows.Count + 1).ToString(),
+                dgvParts.Rows.Insert(insertIndex,
+                    (insertIndex + 1).ToString(),
                     page.ToString(),
                     number.ToString(),
                     string.Empty,
@@ -313,7 +318,7 @@ namespace MSIFAITOOLS
                     string.Empty,
                     string.Empty);
 
-                row = dgvParts.Rows[rowIndex];
+                row = dgvParts.Rows[insertIndex];
                 row.Tag = null;
                 ApplyRowStyle(row, PartVerifyStatus.NotChecked);
                 dgvParts.CurrentCell = row.Cells["colPartName"];
@@ -330,6 +335,40 @@ namespace MSIFAITOOLS
             {
                 dgvParts.BeginEdit(true);
             }
+        }
+
+        /// <summary>
+        /// 取「追加行」的参照行（插入点上一行）：优先取选中行中最靠下的一行，
+        /// 没有选中行时取当前单元格所在行；表格为空时返回 null（表示追加到末尾）。
+        /// </summary>
+        private DataGridViewRow GetInsertAnchorRow()
+        {
+            DataGridViewRow anchor = null;
+
+            foreach (DataGridViewRow row in dgvParts.SelectedRows)
+            {
+                if (row.IsNewRow)
+                {
+                    continue;
+                }
+
+                if (anchor == null || row.Index > anchor.Index)
+                {
+                    anchor = row;
+                }
+            }
+
+            if (anchor == null && dgvParts.CurrentCell != null)
+            {
+                DataGridViewRow currentRow = dgvParts.CurrentCell.OwningRow;
+
+                if (currentRow != null && !currentRow.IsNewRow)
+                {
+                    anchor = currentRow;
+                }
+            }
+
+            return anchor;
         }
 
         /// <summary>「删除行」：删除表格中选中的行（可按住 Ctrl / Shift 多选）。</summary>
@@ -455,12 +494,16 @@ namespace MSIFAITOOLS
                     continue;
                 }
 
-                string key = page.ToString() + "/" + number.ToString();
+                // 唯一键与数据库索引一致：页码 + 番号 + 部品コード
+                // （部品表「下表参照」展开后，同一番号会有多条不同部品コード的明细）
+                string partCode = GetCellText(row, "colPartCode");
+                string key = page.ToString() + "/" + number.ToString() + "/" + partCode;
                 int firstRowNo;
 
                 if (usedKeys.TryGetValue(key, out firstRowNo))
                 {
                     errors.Add("第 " + rowNo + " 行：「页码 " + page + " / 番号 " + number +
+                        " / 部品コード " + (partCode.Length == 0 ? "（空）" : partCode) +
                         "」与第 " + firstRowNo + " 行重复。");
                     continue;
                 }

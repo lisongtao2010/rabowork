@@ -51,12 +51,14 @@ namespace MSIFAITOOLS
             this.mnuPreviewPdf = new System.Windows.Forms.ToolStripMenuItem();
             this.btnSaveClassify = new System.Windows.Forms.Button();
             this.chkAutoPreview = new System.Windows.Forms.CheckBox();
+            this.chkCadSplit = new System.Windows.Forms.CheckBox();
             this.grpAction = new System.Windows.Forms.GroupBox();
             this.progressBar = new System.Windows.Forms.ProgressBar();
             this.lblProgress = new System.Windows.Forms.Label();
             this.btnOpenOutput = new System.Windows.Forms.Button();
             this.btnStart = new System.Windows.Forms.Button();
             this.btnAiAnalyze = new System.Windows.Forms.Button();
+            this.btnCmdAnalyze = new System.Windows.Forms.Button();
             this.btnAiSettings = new System.Windows.Forms.Button();
             this.grpInput = new System.Windows.Forms.GroupBox();
             this.btnBrowse = new System.Windows.Forms.Button();
@@ -159,11 +161,12 @@ namespace MSIFAITOOLS
             this.grpInput.Controls.Add(this.btnBrowse);
             this.grpInput.Controls.Add(this.txtFolder);
             this.grpInput.Controls.Add(this.lblFolder);
+            this.grpInput.Controls.Add(this.chkCadSplit);
             this.grpInput.Font = new System.Drawing.Font("微软雅黑", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
             this.grpInput.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(52)))), ((int)(((byte)(73)))), ((int)(((byte)(94)))));
             this.grpInput.Location = new System.Drawing.Point(20, 16);
             this.grpInput.Name = "grpInput";
-            this.grpInput.Size = new System.Drawing.Size(860, 96);
+            this.grpInput.Size = new System.Drawing.Size(860, 104);
             this.grpInput.TabIndex = 0;
             this.grpInput.TabStop = false;
             this.grpInput.Text = "①  输入设置";
@@ -178,6 +181,20 @@ namespace MSIFAITOOLS
             this.lblFolder.Size = new System.Drawing.Size(80, 17);
             this.lblFolder.TabIndex = 0;
             this.lblFolder.Text = "PDF 文件夹：";
+            // 
+            // chkCadSplit
+            // 
+            this.chkCadSplit.AutoSize = true;
+            this.chkCadSplit.Checked = true;
+            this.chkCadSplit.CheckState = System.Windows.Forms.CheckState.Checked;
+            this.chkCadSplit.Font = new System.Drawing.Font("微软雅黑", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
+            this.chkCadSplit.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(52)))), ((int)(((byte)(73)))), ((int)(((byte)(94)))));
+            this.chkCadSplit.Location = new System.Drawing.Point(112, 68);
+            this.chkCadSplit.Name = "chkCadSplit";
+            this.chkCadSplit.Size = new System.Drawing.Size(330, 21);
+            this.chkCadSplit.TabIndex = 3;
+            this.chkCadSplit.Text = "开始分解前先调用 CadPartSplitter 做零件分割（Part_NN.png 等）";
+            this.chkCadSplit.UseVisualStyleBackColor = true;
             // 
             // txtFolder
             // 
@@ -220,10 +237,11 @@ namespace MSIFAITOOLS
             this.grpAction.Controls.Add(this.btnOpenOutput);
             this.grpAction.Controls.Add(this.btnStart);
             this.grpAction.Controls.Add(this.btnAiAnalyze);
+            this.grpAction.Controls.Add(this.btnCmdAnalyze);
             this.grpAction.Controls.Add(this.btnAiSettings);
             this.grpAction.Font = new System.Drawing.Font("微软雅黑", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
             this.grpAction.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(52)))), ((int)(((byte)(73)))), ((int)(((byte)(94)))));
-            this.grpAction.Location = new System.Drawing.Point(20, 124);
+            this.grpAction.Location = new System.Drawing.Point(20, 126);
             this.grpAction.Name = "grpAction";
             this.grpAction.Size = new System.Drawing.Size(860, 104);
             this.grpAction.TabIndex = 1;
@@ -242,7 +260,7 @@ namespace MSIFAITOOLS
             this.btnStart.ForeColor = System.Drawing.Color.White;
             this.btnStart.Location = new System.Drawing.Point(18, 34);
             this.btnStart.Name = "btnStart";
-            this.btnStart.Size = new System.Drawing.Size(210, 46);
+            this.btnStart.Size = new System.Drawing.Size(190, 46);
             this.btnStart.TabIndex = 0;
             this.btnStart.Text = "开始分解";
             this.btnStart.UseVisualStyleBackColor = false;
@@ -258,13 +276,31 @@ namespace MSIFAITOOLS
             this.btnAiAnalyze.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.btnAiAnalyze.Font = new System.Drawing.Font("微软雅黑", 11F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
             this.btnAiAnalyze.ForeColor = System.Drawing.Color.White;
-            this.btnAiAnalyze.Location = new System.Drawing.Point(240, 34);
+            this.btnAiAnalyze.Location = new System.Drawing.Point(214, 34);
             this.btnAiAnalyze.Name = "btnAiAnalyze";
-            this.btnAiAnalyze.Size = new System.Drawing.Size(150, 46);
+            this.btnAiAnalyze.Size = new System.Drawing.Size(112, 46);
             this.btnAiAnalyze.TabIndex = 1;
             this.btnAiAnalyze.Text = "AI 分析";
             this.btnAiAnalyze.UseVisualStyleBackColor = false;
             this.btnAiAnalyze.Click += new System.EventHandler(this.BtnAiAnalyze_Click);
+            // 
+            // btnCmdAnalyze
+            // 
+            this.btnCmdAnalyze.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(121)))), ((int)(((byte)(107)))));
+            this.btnCmdAnalyze.Cursor = System.Windows.Forms.Cursors.Hand;
+            this.btnCmdAnalyze.FlatAppearance.BorderSize = 0;
+            this.btnCmdAnalyze.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(77)))), ((int)(((byte)(64)))));
+            this.btnCmdAnalyze.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(150)))), ((int)(((byte)(136)))));
+            this.btnCmdAnalyze.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnCmdAnalyze.Font = new System.Drawing.Font("微软雅黑", 11F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
+            this.btnCmdAnalyze.ForeColor = System.Drawing.Color.White;
+            this.btnCmdAnalyze.Location = new System.Drawing.Point(332, 34);
+            this.btnCmdAnalyze.Name = "btnCmdAnalyze";
+            this.btnCmdAnalyze.Size = new System.Drawing.Size(118, 46);
+            this.btnCmdAnalyze.TabIndex = 2;
+            this.btnCmdAnalyze.Text = "CMD 分析";
+            this.btnCmdAnalyze.UseVisualStyleBackColor = false;
+            this.btnCmdAnalyze.Click += new System.EventHandler(this.BtnCmdAnalyze_Click);
             // 
             // btnOpenOutput
             // 
@@ -275,10 +311,10 @@ namespace MSIFAITOOLS
             this.btnOpenOutput.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.btnOpenOutput.Font = new System.Drawing.Font("微软雅黑", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
             this.btnOpenOutput.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(52)))), ((int)(((byte)(73)))), ((int)(((byte)(94)))));
-            this.btnOpenOutput.Location = new System.Drawing.Point(400, 34);
+            this.btnOpenOutput.Location = new System.Drawing.Point(456, 34);
             this.btnOpenOutput.Name = "btnOpenOutput";
-            this.btnOpenOutput.Size = new System.Drawing.Size(140, 46);
-            this.btnOpenOutput.TabIndex = 2;
+            this.btnOpenOutput.Size = new System.Drawing.Size(128, 46);
+            this.btnOpenOutput.TabIndex = 3;
             this.btnOpenOutput.Text = "打开输出目录";
             this.btnOpenOutput.UseVisualStyleBackColor = false;
             this.btnOpenOutput.Click += new System.EventHandler(this.BtnOpenOutput_Click);
@@ -292,10 +328,10 @@ namespace MSIFAITOOLS
             this.btnAiSettings.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.btnAiSettings.Font = new System.Drawing.Font("微软雅黑", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
             this.btnAiSettings.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(52)))), ((int)(((byte)(73)))), ((int)(((byte)(94)))));
-            this.btnAiSettings.Location = new System.Drawing.Point(550, 34);
+            this.btnAiSettings.Location = new System.Drawing.Point(590, 34);
             this.btnAiSettings.Name = "btnAiSettings";
-            this.btnAiSettings.Size = new System.Drawing.Size(110, 46);
-            this.btnAiSettings.TabIndex = 3;
+            this.btnAiSettings.Size = new System.Drawing.Size(96, 46);
+            this.btnAiSettings.TabIndex = 4;
             this.btnAiSettings.Text = "AI 设置";
             this.btnAiSettings.UseVisualStyleBackColor = false;
             this.btnAiSettings.Click += new System.EventHandler(this.BtnAiSettings_Click);
@@ -305,20 +341,20 @@ namespace MSIFAITOOLS
             this.lblProgress.AutoSize = true;
             this.lblProgress.Font = new System.Drawing.Font("微软雅黑", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
             this.lblProgress.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(108)))), ((int)(((byte)(117)))), ((int)(((byte)(125)))));
-            this.lblProgress.Location = new System.Drawing.Point(668, 34);
+            this.lblProgress.Location = new System.Drawing.Point(692, 34);
             this.lblProgress.Name = "lblProgress";
             this.lblProgress.Size = new System.Drawing.Size(56, 17);
-            this.lblProgress.TabIndex = 3;
+            this.lblProgress.TabIndex = 5;
             this.lblProgress.Text = "等待开始";
             // 
             // progressBar
             // 
             this.progressBar.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.progressBar.Location = new System.Drawing.Point(668, 56);
+            this.progressBar.Location = new System.Drawing.Point(692, 56);
             this.progressBar.Name = "progressBar";
-            this.progressBar.Size = new System.Drawing.Size(184, 18);
-            this.progressBar.TabIndex = 4;
+            this.progressBar.Size = new System.Drawing.Size(150, 18);
+            this.progressBar.TabIndex = 6;
             // 
             // grpLog
             // 
@@ -329,7 +365,7 @@ namespace MSIFAITOOLS
             this.grpLog.Controls.Add(this.tabMain);
             this.grpLog.Font = new System.Drawing.Font("微软雅黑", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
             this.grpLog.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(52)))), ((int)(((byte)(73)))), ((int)(((byte)(94)))));
-            this.grpLog.Location = new System.Drawing.Point(20, 240);
+            this.grpLog.Location = new System.Drawing.Point(20, 242);
             this.grpLog.Name = "grpLog";
             this.grpLog.Size = new System.Drawing.Size(860, 340);
             this.grpLog.TabIndex = 2;
@@ -641,9 +677,11 @@ namespace MSIFAITOOLS
         private System.Windows.Forms.Label lblFolder;
         private System.Windows.Forms.TextBox txtFolder;
         private System.Windows.Forms.Button btnBrowse;
+        private System.Windows.Forms.CheckBox chkCadSplit;
         private System.Windows.Forms.GroupBox grpAction;
         private System.Windows.Forms.Button btnStart;
         private System.Windows.Forms.Button btnAiAnalyze;
+        private System.Windows.Forms.Button btnCmdAnalyze;
         private System.Windows.Forms.Button btnAiSettings;
         private System.Windows.Forms.Button btnOpenOutput;
         private System.Windows.Forms.Label lblProgress;

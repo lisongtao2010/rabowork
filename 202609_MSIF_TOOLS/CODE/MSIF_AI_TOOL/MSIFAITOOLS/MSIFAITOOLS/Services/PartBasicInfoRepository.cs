@@ -27,6 +27,12 @@ namespace MSIFAITOOLS.Services
         /// <summary>App.config 中指定数据库路径的键名。</summary>
         public const string DatabasePathSettingKey = "PartDatabasePath";
 
+        /// <summary>唯一索引名：図番 + 页码 + 番号 + 部品コード（同一番号でも部品コードが違えば別行）。</summary>
+        public const string UniqueIndexName = "ux_部品基本信息_図番_页码_番号_部品コード";
+
+        /// <summary>旧版唯一索引名（図番 + 页码 + 番号）。打开数据库时删除并升级成 <see cref="UniqueIndexName"/>。</summary>
+        public const string LegacyUniqueIndexName = "ux_部品基本信息_図番_页码_番号";
+
         private static readonly string[] ColumnNames = new string[]
         {
             "図番", "页码", "番号", "部品名", "部品図番", "枠区分", "員数",
@@ -105,6 +111,12 @@ namespace MSIFAITOOLS.Services
 
         /// <summary>
         /// 建表（已存在则跳过）并创建索引。
+        ///
+        /// 唯一键 = 図番 + 页码 + 番号 + 部品コード：
+        /// 部品表里「下表参照」的行会被展开成多条同一番号、不同部品コード的明细
+        /// （见 CadPartSplitter 的 LT_STEP1.csv），只用「図番 + 页码 + 番号」做唯一键会把它们互相顶掉。
+        /// 旧版本留下的索引 <see cref="LegacyUniqueIndexName"/> 在这里删除并换成 <see cref="UniqueIndexName"/>，
+        /// 已有数据库打开时自动迁移（旧索引保证旧数据在新索引下同样唯一）。
         /// </summary>
         private void EnsureSchema()
         {
@@ -128,13 +140,16 @@ namespace MSIFAITOOLS.Services
                 "[登录时间] TEXT NOT NULL" +
                 ");";
 
+            string dropLegacyIndex = "DROP INDEX IF EXISTS [" + LegacyUniqueIndexName + "];";
+
             string createIndex =
-                "CREATE UNIQUE INDEX IF NOT EXISTS [ux_" + TableName + "_図番_页码_番号] ON [" + TableName +
-                "] ([図番], [页码], [番号]);";
+                "CREATE UNIQUE INDEX IF NOT EXISTS [" + UniqueIndexName + "] ON [" + TableName +
+                "] ([図番], [页码], [番号], [部品コード]);";
 
             using (SQLiteTransaction transaction = _connection.BeginTransaction())
             {
                 Execute(createTable, transaction);
+                Execute(dropLegacyIndex, transaction);
                 Execute(createIndex, transaction);
                 transaction.Commit();
             }

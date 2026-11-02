@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("PathProbe")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+b05bb542a48e28c5c9ca64607a86e488c2f06699")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+890a4a49d840fc1500a3d12bbddc1404f002b10e")]
 [assembly: System.Reflection.AssemblyProductAttribute("PathProbe")]
 [assembly: System.Reflection.AssemblyTitleAttribute("PathProbe")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

@@ -52,6 +52,10 @@
   <ItemGroup>
     <Compile Include="Program.cs" />
     <Compile Include="CommandLineRunner.cs" />
+    <Compile Include="BatchRunner.cs" />
+    <Compile Include="SplitApi.cs" />
+    <Compile Include="SplitResult.cs" />
+    <Compile Include="GuiSettings.cs" />
     <Compile Include="MainForm.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -65,6 +69,12 @@
     <Compile Include="PartInfo.cs" />
     <Compile Include="PartText.cs" />
     <Compile Include="PartTextExtractor.cs" />
+    <Compile Include="RuledTable.cs" />
+    <Compile Include="RuledTableExtractor.cs" />
+    <Compile Include="RuledTableWriter.cs" />
+    <Compile Include="CsvFile.cs" />
+    <Compile Include="LtStep1Builder.cs" />
+    <Compile Include="LtStep2Builder.cs" />
     <Compile Include="Callout.cs" />
     <Compile Include="CalloutExtractor.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
@@ -74,8 +84,11 @@
     <None Include="README.md" />
     <None Include="docs\分割原理.md" />
     <None Include="_test\gen_test_drawing.ps1" />
-    <None Include="_test\gui_test.ps1" />
     <None Include="_test\gen_test_raster.ps1" />
+    <None Include="_test\gui_shot.ps1" />
+    <None Include="_test\api_probe.ps1" />
+    <None Include="_test\gui_output_probe.ps1" />
+    <None Include="_test\gui_batch_probe.ps1" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="OpenCvSharp4">

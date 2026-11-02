@@ -3,7 +3,7 @@ using System;
 namespace MSIFAITOOLS.Services
 {
     /// <summary>
-    /// 从 PDF 表格（*_plu_table.txt）中提取的一条部品基本信息。
+    /// 从 PDF 表格（plu_table.txt）中提取的一条部品基本信息。
     /// 字段与 SQLite 的「部品基本信息」表一一对应，一处改动需同步另一处。
     /// </summary>
     internal sealed class PartBasicInfo
@@ -64,7 +64,7 @@ namespace MSIFAITOOLS.Services
         /// <summary>备注：坐标校验明细、AI 提示等。</summary>
         public string Remark { get; set; }
 
-        /// <summary>来源文件（*_plu_table.txt 的完整路径）。</summary>
+        /// <summary>来源文件（plu_table.txt 的完整路径）。</summary>
         public string SourceFile { get; set; }
 
         /// <summary>来源 PDF 的完整路径。</summary>
@@ -88,13 +88,13 @@ namespace MSIFAITOOLS.Services
     /// <summary>部品基本信息的坐标校验状态（同时作为写入数据库的文字）。</summary>
     internal static class PartVerifyStatus
     {
-        /// <summary>部品名 / 部品コード 在 _xy.txt 的对应页中全部找到。</summary>
+        /// <summary>部品名 / 部品コード 在 xy.txt 的对应页中全部找到。</summary>
         public const string Passed = "坐标一致";
 
-        /// <summary>有部品名 / 部品コード 未能在 _xy.txt 中找到。</summary>
+        /// <summary>有部品名 / 部品コード 未能在 xy.txt 中找到。</summary>
         public const string Failed = "坐标不符";
 
-        /// <summary>没有 _xy.txt（或无法解析），未做校验。</summary>
+        /// <summary>没有 xy.txt（或无法解析），未做校验。</summary>
         public const string NotChecked = "未校验";
 
         /// <summary>全部状态（画面下拉框的候选项）。</summary>

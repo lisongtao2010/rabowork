@@ -41,7 +41,7 @@ namespace MSIFAITOOLS.Services
         /// </code>
         /// </summary>
         /// <param name="pdfFilePath">PDF 文件的完整路径。</param>
-        /// <param name="outputPath">生成的 &lt;図番号&gt;_xy.txt 完整路径。</param>
+        /// <param name="outputPath">生成的 &lt;図番号&gt;\xy.txt 完整路径。</param>
         public static void WriteWordCoordinates(string pdfFilePath, string outputPath)
         {
             if (string.IsNullOrWhiteSpace(pdfFilePath))
@@ -109,7 +109,7 @@ namespace MSIFAITOOLS.Services
         ///   3) 垂直方向只取页面总高度 85% 以内的文字（自页面顶部向下计算），
         ///      最下方 15% 的注記 / 改訂履歴 / 表題欄不计入；
         ///   4) 找不到这两处表头时该页不做水平限制，只按 85% 高度过滤。
-        /// 输出格式与 &lt;図番号&gt;_xy.txt 完全一致，便于用同一套解析代码读取。
+        /// 输出格式与 &lt;図番号&gt;\xy.txt 完全一致，便于用同一套解析代码读取。
         /// </summary>
         /// <param name="pdfFilePath">PDF 文件的完整路径。</param>
         /// <param name="outputPath">生成的 &lt;図番号&gt;_xy_imgtext.txt 完整路径。</param>
@@ -134,7 +134,7 @@ namespace MSIFAITOOLS.Services
                 {
                     Page page = document.GetPage(pageNumber);
 
-                    // 与 _xy.txt 使用相同的取词方式与坐标换算，保证两份结果的坐标可以直接对照
+                    // 与 xy.txt 使用相同的取词方式与坐标换算，保证两份结果的坐标可以直接对照
                     double pageHeight = page.Height;
 
                     List<Word> words = new List<Word>();
@@ -171,7 +171,7 @@ namespace MSIFAITOOLS.Services
                     {
                         var box = word.BoundingBox;
                         double centerX = (box.Left + box.Right) / 2.0;
-                        // 换算成左上角原点、Y 轴向下的坐标（与 _xy.txt 一致）
+                        // 换算成左上角原点、Y 轴向下的坐标（与 xy.txt 一致）
                         double centerY = pageHeight - ((box.Top + box.Bottom) / 2.0);
 
                         if (centerY > limitY)
@@ -233,7 +233,7 @@ namespace MSIFAITOOLS.Services
         /// 未识别到表格的页写占位说明，便于按页对照原图纸。
         /// </summary>
         /// <param name="pdfFilePath">PDF 文件的完整路径。</param>
-        /// <param name="outputPath">生成的 &lt;図番号&gt;_table.txt 完整路径。</param>
+        /// <param name="outputPath">生成的 &lt;図番号&gt;\table.txt 完整路径。</param>
         public static void WriteTableText(string pdfFilePath, string outputPath)
         {
             if (string.IsNullOrWhiteSpace(pdfFilePath))
@@ -297,10 +297,10 @@ namespace MSIFAITOOLS.Services
         /// 本重载不生成图上文字文件，保留给只关心原有四种输出的调用方。
         /// </summary>
         /// <param name="pdfFilePath">PDF 文件的完整路径。</param>
-        /// <param name="plainPath">&lt;図番号&gt;_plu_text.txt 的完整路径。</param>
-        /// <param name="layoutPath">&lt;図番号&gt;_plu_layout.txt 的完整路径。</param>
-        /// <param name="tablePath">&lt;図番号&gt;_plu_table.txt 的完整路径。</param>
-        /// <param name="allPath">&lt;図番号&gt;_plu_all.txt 的完整路径。</param>
+        /// <param name="plainPath">&lt;図番号&gt;\plu_text.txt 的完整路径。</param>
+        /// <param name="layoutPath">&lt;図番号&gt;\plu_layout.txt 的完整路径。</param>
+        /// <param name="tablePath">&lt;図番号&gt;\plu_table.txt 的完整路径。</param>
+        /// <param name="allPath">&lt;図番号&gt;\plu_all.txt 的完整路径。</param>
         public static void WritePluSet(string pdfFilePath, string plainPath, string layoutPath,
             string tablePath, string allPath)
         {
@@ -311,14 +311,14 @@ namespace MSIFAITOOLS.Services
         /// 一次性生成 plu 的五种输出（只打开 PDF 一次，避免同一文档被重复解析）：
         /// 纯文本、版面文本、表格、图上文字、文本+表格。
         /// 图上文字按“图片区域与文字坐标比对”判定，表格块内的文字不重复计入，
-        /// 并且只写独立的 _plu_image.txt，不并入 _plu_all（避免影响分类判定）。
+        /// 并且只写独立的 plu_image.txt，不并入 plu_all（避免影响分类判定）。
         /// </summary>
         /// <param name="pdfFilePath">PDF 文件的完整路径。</param>
-        /// <param name="plainPath">&lt;図番号&gt;_plu_text.txt 的完整路径。</param>
-        /// <param name="layoutPath">&lt;図番号&gt;_plu_layout.txt 的完整路径。</param>
-        /// <param name="tablePath">&lt;図番号&gt;_plu_table.txt 的完整路径。</param>
-        /// <param name="allPath">&lt;図番号&gt;_plu_all.txt 的完整路径。</param>
-        /// <param name="imagePath">&lt;図番号&gt;_plu_image.txt 的完整路径；为 null 或空白时不生成该文件。</param>
+        /// <param name="plainPath">&lt;図番号&gt;\plu_text.txt 的完整路径。</param>
+        /// <param name="layoutPath">&lt;図番号&gt;\plu_layout.txt 的完整路径。</param>
+        /// <param name="tablePath">&lt;図番号&gt;\plu_table.txt 的完整路径。</param>
+        /// <param name="allPath">&lt;図番号&gt;\plu_all.txt 的完整路径。</param>
+        /// <param name="imagePath">&lt;図番号&gt;\plu_image.txt 的完整路径；为 null 或空白时不生成该文件。</param>
         public static void WritePluSet(string pdfFilePath, string plainPath, string layoutPath,
             string tablePath, string allPath, string imagePath)
         {
@@ -420,7 +420,7 @@ namespace MSIFAITOOLS.Services
                     WriteTableBlock(allWriter, tableLines);
                     allWriter.WriteLine();
 
-                    // 注意：图上文字只写独立文件，不并入 _plu_all，
+                    // 注意：图上文字只写独立文件，不并入 plu_all，
                     // 以免图号在图内重复出现而影响 PdfClassifier 对 plu_all 的行扫描。
                 }
             }

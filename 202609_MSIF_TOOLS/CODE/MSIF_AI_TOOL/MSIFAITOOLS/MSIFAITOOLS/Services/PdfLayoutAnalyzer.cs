@@ -186,7 +186,7 @@ namespace MSIFAITOOLS.Services
 
         /// <summary>
         /// 一个表格块：连续若干行 + 外接矩形 + 列锚点，
-        /// 用于把表格文字（已输出到 _plu_table.txt）与图上文字区分开，避免重复。
+        /// 用于把表格文字（已输出到 plu_table.txt）与图上文字区分开，避免重复。
         /// 判定表格文字时用的是“有效 X 范围”（过滤噪声列后的横向范围），而不是单纯的外接矩形。
         /// </summary>
         internal sealed class LayoutBlock
@@ -825,7 +825,7 @@ namespace MSIFAITOOLS.Services
         /// <summary>
         /// 生成“图上文字”结果（坐标比对判定）：
         /// 1) 页面有图片对象时：把词按“中心点落在哪个图片区域内”分组，逐图输出图内文字行，
-        ///    已被判定为表格文字的行会跳过（表格文字见 _plu_table.txt，避免重复）；
+        ///    已被判定为表格文字的行会跳过（表格文字见 plu_table.txt，避免重复）；
         /// 2) 页面没有图片对象时：退化为“表格之外的文字”，保证矢量图页面也能得到有用结果。
         /// 表格文字按“表格块外接矩形 + 有效 X 范围”判定，与表格左右并排的图纸标注仍算图上文字。
         /// </summary>
@@ -923,7 +923,7 @@ namespace MSIFAITOOLS.Services
                 {
                     output.Add(groups[i].Count == 0
                         ? "  （图内没有文字）"
-                        : "  （图内文字均属于表格，见 _plu_table.txt）");
+                        : "  （图内文字均属于表格，见 plu_table.txt）");
                 }
             }
 

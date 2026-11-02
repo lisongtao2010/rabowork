@@ -2,9 +2,9 @@
 """
 PDF 批量分解脚本（PyMuPDF + MarkItDown 合并版）
 
-把指定文件夹中的所有 PDF 一次分解，结果保存到该文件夹下的两个子文件夹：
-  1) <文件夹>/xy/    ：每个 PDF 生成 <図番号>_xy.txt    （PyMuPDF 提取的文字及坐标）
-  2) <文件夹>/table/ ：每个 PDF 生成 <図番号>_table.txt （MarkItDown 提取的表格）
+把指定文件夹中的所有 PDF 一次分解，结果保存到该文件夹下的 AiAppData/<図番号>/ 子文件夹：
+  1) <文件夹>/AiAppData/<図番号>/xy.txt    （PyMuPDF 提取的文字及坐标）
+  2) <文件夹>/AiAppData/<図番号>/table.txt （MarkItDown 提取的表格）
 
 用法:
     python PDF_SPLIT.py <PDF所在文件夹>
@@ -73,11 +73,9 @@ def main():
         print("ERROR: 该文件夹中没有找到 PDF 文件！")
         return 1
 
-    # 两个结果子文件夹（都建在 PDF 所在文件夹里）
-    xy_dir = os.path.join(folder, "xy")
-    table_dir = os.path.join(folder, "table")
-    os.makedirs(xy_dir, exist_ok=True)
-    os.makedirs(table_dir, exist_ok=True)
+    # 所有输出集中到 <文件夹>/AiAppData/<図番号>/ 下（每个 PDF 一个子文件夹）
+    output_root = os.path.join(folder, "AiAppData")
+    os.makedirs(output_root, exist_ok=True)
 
     errors = []
     ok_count = 0
@@ -85,10 +83,12 @@ def main():
 
     for i, name in enumerate(pdfs, start=1):
         pdf_path = os.path.join(folder, name)
-        # 図番号 = PDF 文件名（不含扩展名）
+        # 図番号 = PDF 文件名（不含扩展名），同时作为输出子文件夹名
         stem = os.path.splitext(name)[0]
-        xy_path = os.path.join(xy_dir, stem + "_xy.txt")
-        table_path = os.path.join(table_dir, stem + "_table.txt")
+        pdf_dir = os.path.join(output_root, stem)
+        os.makedirs(pdf_dir, exist_ok=True)
+        xy_path = os.path.join(pdf_dir, "xy.txt")
+        table_path = os.path.join(pdf_dir, "table.txt")
 
         print(f"[{i}/{total}] 正在处理: {name}")
         failed = False
@@ -117,8 +117,7 @@ def main():
         return 1
 
     print(f"SUCCESS {ok_count}/{total}")
-    print(f"XY_DIR: {xy_dir}")
-    print(f"TABLE_DIR: {table_dir}")
+    print(f"OUTPUT_ROOT: {output_root}")
     return 0
 
 

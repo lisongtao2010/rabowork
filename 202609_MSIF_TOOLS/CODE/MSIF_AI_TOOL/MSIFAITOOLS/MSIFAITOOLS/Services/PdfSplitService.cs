@@ -54,15 +54,12 @@ namespace MSIFAITOOLS.Services
     internal sealed class PdfSplitResult
     {
         public PdfSplitResult(int total, int succeeded, IList<string> errors,
-            string xyDirectory, string tableDirectory, string pluDirectory,
-            string classifyDirectory, IList<PdfClassification> classifications)
+            string outputDirectory, string classifyDirectory, IList<PdfClassification> classifications)
         {
             Total = total;
             Succeeded = succeeded;
             Errors = new List<string>(errors ?? new string[0]).AsReadOnly();
-            XyDirectory = xyDirectory;
-            TableDirectory = tableDirectory;
-            PluDirectory = pluDirectory;
+            OutputDirectory = outputDirectory;
             ClassifyDirectory = classifyDirectory;
             Classifications = classifications == null
                 ? new List<PdfClassification>().AsReadOnly()
@@ -78,16 +75,10 @@ namespace MSIFAITOOLS.Services
         /// <summary>失败明细，每条为 “文件名: 失败原因”。</summary>
         public IList<string> Errors { get; }
 
-        /// <summary>坐标输出目录（&lt;文件夹&gt;\AppData\xy）。</summary>
-        public string XyDirectory { get; }
+        /// <summary>分解输出根目录（&lt;文件夹&gt;\AiAppData；其下每个 PDF 一个以図番号命名的子文件夹）。</summary>
+        public string OutputDirectory { get; }
 
-        /// <summary>表格输出目录（&lt;文件夹&gt;\AppData\table）。</summary>
-        public string TableDirectory { get; }
-
-        /// <summary>plu 系列输出目录（&lt;文件夹&gt;\AppData\plu）。</summary>
-        public string PluDirectory { get; }
-
-        /// <summary>分类结果目录（&lt;文件夹&gt;\AppData\classify）。</summary>
+        /// <summary>分类结果目录（&lt;文件夹&gt;\AiAppData\classify）。</summary>
         public string ClassifyDirectory { get; }
 
         /// <summary>每个 PDF 的分类结果（与文件名顺序一致）。</summary>
@@ -108,57 +99,49 @@ namespace MSIFAITOOLS.Services
 
     /// <summary>
     /// PDF 批量分解服务（纯 .NET 实现，替代原 PDF_SPLIT.py）。
-    /// 对指定文件夹第一层的所有 PDF 生成结果，统一输出到 &lt;文件夹&gt;\AppData 下（不存在时自动创建）：
-    ///   1) &lt;文件夹&gt;\AppData\xy\&lt;図番号&gt;_xy.txt    —— 每页文字及其坐标；
-    ///      &lt;文件夹&gt;\AppData\xy\&lt;図番号&gt;_xy_imgtext.txt —— 图面文字及其坐标
+    /// 对指定文件夹第一层的所有 PDF 生成结果，统一输出到 &lt;文件夹&gt;\AiAppData 下的「図番号」子文件夹
+    /// （不存在时自动创建，子文件夹名 = PDF 文件名去掉扩展名）：
+    ///   1) &lt;文件夹&gt;\AiAppData\&lt;図番号&gt;\xy.txt        —— 每页文字及其坐标；
+    ///      &lt;文件夹&gt;\AiAppData\&lt;図番号&gt;\xy_imgtext.txt —— 图面文字及其坐标
     ///      （按「番号」「タイプ名」表头的更靠左者作水平分界，只取分界左侧、页面高度 85% 以内的文字）；
-    ///   2) &lt;文件夹&gt;\AppData\table\&lt;図番号&gt;_table.txt —— 每页表格（单元格以 “|” 分隔）；
-    ///   3) &lt;文件夹&gt;\AppData\plu\&lt;図番号&gt;_plu_*.txt  —— pdfplumber 风格的五份结果
-    ///      （_plu_text / _plu_layout / _plu_table / _plu_image / _plu_all）；
-    ///      其中 _plu_image 为“图上文字”：按图片区域与文字坐标比对判定，表格文字不重复计入
+    ///   2) &lt;文件夹&gt;\AiAppData\&lt;図番号&gt;\table.txt     —— 每页表格（单元格以 “|” 分隔）；
+    ///   3) &lt;文件夹&gt;\AiAppData\&lt;図番号&gt;\plu_*.txt     —— pdfplumber 风格的五份结果
+    ///      （plu_text / plu_layout / plu_table / plu_image / plu_all）；
+    ///      其中 plu_image 为“图上文字”：按图片区域与文字坐标比对判定，表格文字不重复计入
     ///      （表格文字按“表格块外接矩形 + 有效 X 范围”判定，与表格左右并排的图纸标注仍算图上文字）；
-    ///   4) &lt;文件夹&gt;\AppData\classify\classification.csv —— 每个 PDF 的分类结果
+    ///   4) &lt;文件夹&gt;\AiAppData\classify\classification.csv —— 每个 PDF 的分类结果
     ///      （基本図 / 加工図 / アッセンブリ図 / 要領図 / 未知）。
     /// </summary>
     internal sealed class PdfSplitService
     {
         /// <summary>
-        /// 所有输出统一放到的根子文件夹名：&lt;PDF 文件夹&gt;\AppData（不存在时自动创建）。
+        /// 所有输出统一放到的根子文件夹名：&lt;PDF 文件夹&gt;\AiAppData（不存在时自动创建）。
         /// </summary>
-        public const string OutputRootFolderName = "AppData";
+        public const string OutputRootFolderName = "AiAppData";
 
-        /// <summary>坐标结果子文件夹名。</summary>
-        public const string XyFolderName = "xy";
+        /// <summary>坐标文件名（每个 PDF 的「図番号」子文件夹内）。</summary>
+        public const string XyFileName = "xy.txt";
 
-        /// <summary>表格结果子文件夹名。</summary>
-        public const string TableFolderName = "table";
+        /// <summary>图面文字坐标文件名（只包含图纸区域的文字）。</summary>
+        public const string XyImageTextFileName = "xy_imgtext.txt";
 
-        /// <summary>坐标文件名后缀。</summary>
-        public const string XyFileSuffix = "_xy.txt";
+        /// <summary>表格文件名。</summary>
+        public const string TableFileName = "table.txt";
 
-        /// <summary>图面文字坐标文件名后缀（只包含图纸区域的文字）。</summary>
-        public const string XyImageTextFileSuffix = "_xy_imgtext.txt";
+        /// <summary>plu 纯文本文件名（对应 pdfplumber 的 extract_text()）。</summary>
+        public const string PluTextFileName = "plu_text.txt";
 
-        /// <summary>表格文件名后缀。</summary>
-        public const string TableFileSuffix = "_table.txt";
+        /// <summary>plu 版面文本文件名（对应 pdfplumber 的 extract_text(layout=True)）。</summary>
+        public const string PluLayoutFileName = "plu_layout.txt";
 
-        /// <summary>plu 系列结果子文件夹名。</summary>
-        public const string PluFolderName = "plu";
+        /// <summary>plu 表格文件名（对应 pdfplumber 的 extract_tables()）。</summary>
+        public const string PluTableFileName = "plu_table.txt";
 
-        /// <summary>plu 纯文本后缀（对应 pdfplumber 的 extract_text()）。</summary>
-        public const string PluTextFileSuffix = "_plu_text.txt";
+        /// <summary>plu 图上文字文件名（图片区域与文字坐标比对；无图片时退化为表格之外的文字）。</summary>
+        public const string PluImageFileName = "plu_image.txt";
 
-        /// <summary>plu 版面文本后缀（对应 pdfplumber 的 extract_text(layout=True)）。</summary>
-        public const string PluLayoutFileSuffix = "_plu_layout.txt";
-
-        /// <summary>plu 表格后缀（对应 pdfplumber 的 extract_tables()）。</summary>
-        public const string PluTableFileSuffix = "_plu_table.txt";
-
-        /// <summary>plu 图上文字后缀（图片区域与文字坐标比对；无图片时退化为表格之外的文字）。</summary>
-        public const string PluImageFileSuffix = "_plu_image.txt";
-
-        /// <summary>plu 文本 + 表格合并后缀。</summary>
-        public const string PluAllFileSuffix = "_plu_all.txt";
+        /// <summary>plu 文本 + 表格合并文件名。</summary>
+        public const string PluAllFileName = "plu_all.txt";
 
         /// <summary>
         /// 找出文件夹第一层中所有 PDF 文件，返回按序号（Ordinal）排序的文件名（不含路径）。
@@ -194,29 +177,59 @@ namespace MSIFAITOOLS.Services
         }
 
         /// <summary>
-        /// 计算分解输出目录（只计算路径，不创建目录）：
-        /// &lt;PDF 文件夹&gt;\AppData\{xy, table, plu, classify}。
+        /// 计算分解输出根目录（只计算路径，不创建目录）：&lt;PDF 文件夹&gt;\AiAppData。
         /// </summary>
         /// <param name="folder">PDF 所在文件夹。</param>
-        /// <param name="xyDirectory">坐标输出目录。</param>
-        /// <param name="tableDirectory">表格输出目录。</param>
-        /// <param name="pluDirectory">plu 五份输出目录。</param>
-        /// <param name="classifyDirectory">分类结果目录。</param>
-        public static void GetOutputDirectories(string folder, out string xyDirectory,
-            out string tableDirectory, out string pluDirectory, out string classifyDirectory)
+        public static string GetOutputRoot(string folder)
         {
-            string outputRoot = Path.Combine(folder, OutputRootFolderName);
-            xyDirectory = Path.Combine(outputRoot, XyFolderName);
-            tableDirectory = Path.Combine(outputRoot, TableFolderName);
-            pluDirectory = Path.Combine(outputRoot, PluFolderName);
-            classifyDirectory = Path.Combine(outputRoot, PdfClassifier.ClassifyFolderName);
+            if (string.IsNullOrWhiteSpace(folder))
+            {
+                throw new ArgumentException("PDF 文件夹不能为空。", nameof(folder));
+            }
+
+            return Path.Combine(folder, OutputRootFolderName);
+        }
+
+        /// <summary>
+        /// 计算单个 PDF 的输出目录（只计算路径，不创建目录）：&lt;输出根目录&gt;\&lt;図番号&gt;。
+        /// 该目录下直接存放 xy.txt、table.txt、plu_*.txt（文件名不再包含 PDF 文件名）。
+        /// </summary>
+        /// <param name="outputRoot">输出根目录（见 <see cref="GetOutputRoot"/>）。</param>
+        /// <param name="stem">図番号（PDF 文件名去掉扩展名）。</param>
+        public static string GetPdfOutputDirectory(string outputRoot, string stem)
+        {
+            if (string.IsNullOrWhiteSpace(outputRoot))
+            {
+                throw new ArgumentException("输出根目录不能为空。", nameof(outputRoot));
+            }
+
+            if (string.IsNullOrWhiteSpace(stem))
+            {
+                throw new ArgumentException("図番号不能为空。", nameof(stem));
+            }
+
+            return Path.Combine(outputRoot, stem);
+        }
+
+        /// <summary>
+        /// 计算分类结果目录（只计算路径，不创建目录）：&lt;输出根目录&gt;\classify。
+        /// </summary>
+        /// <param name="outputRoot">输出根目录（见 <see cref="GetOutputRoot"/>）。</param>
+        public static string GetClassifyDirectory(string outputRoot)
+        {
+            if (string.IsNullOrWhiteSpace(outputRoot))
+            {
+                throw new ArgumentException("输出根目录不能为空。", nameof(outputRoot));
+            }
+
+            return Path.Combine(outputRoot, PdfClassifier.ClassifyFolderName);
         }
 
         /// <summary>
         /// 统计“分解产物已齐全”的 PDF 数量（用于判断是否需要询问用户重新分解）。
-        /// 每个 PDF 需同时存在以下 txt：
-        /// *_xy.txt、*_xy_imgtext.txt、*_table.txt、*_plu_text.txt、*_plu_layout.txt、
-        /// *_plu_table.txt、*_plu_image.txt、*_plu_all.txt。
+        /// 每个 PDF 需在其「図番号」子文件夹（&lt;文件夹&gt;\AiAppData\&lt;図番号&gt;）中同时存在以下 txt：
+        /// xy.txt、xy_imgtext.txt、table.txt、plu_text.txt、plu_layout.txt、
+        /// plu_table.txt、plu_image.txt、plu_all.txt。
         /// </summary>
         /// <param name="folder">PDF 所在文件夹。</param>
         /// <param name="pdfNames">PDF 文件名集合（含扩展名，通常来自 <see cref="FindPdfFiles"/>）。</param>
@@ -230,12 +243,7 @@ namespace MSIFAITOOLS.Services
                 return 0;
             }
 
-            string xyDirectory;
-            string tableDirectory;
-            string pluDirectory;
-            string classifyDirectory;
-            GetOutputDirectories(folder, out xyDirectory, out tableDirectory, out pluDirectory,
-                out classifyDirectory);
+            string outputRoot = GetOutputRoot(folder);
 
             int completed = 0;
 
@@ -246,18 +254,19 @@ namespace MSIFAITOOLS.Services
                     continue;
                 }
 
-                // 図番号 = PDF 文件名（不含扩展名）
+                // 図番号 = PDF 文件名（不含扩展名），同时作为输出子文件夹名
                 string stem = Path.GetFileNameWithoutExtension(name);
+                string pdfOutputDirectory = GetPdfOutputDirectory(outputRoot, stem);
                 string[] paths = new string[]
                 {
-                    Path.Combine(xyDirectory, stem + XyFileSuffix),
-                    Path.Combine(xyDirectory, stem + XyImageTextFileSuffix),
-                    Path.Combine(tableDirectory, stem + TableFileSuffix),
-                    Path.Combine(pluDirectory, stem + PluTextFileSuffix),
-                    Path.Combine(pluDirectory, stem + PluLayoutFileSuffix),
-                    Path.Combine(pluDirectory, stem + PluTableFileSuffix),
-                    Path.Combine(pluDirectory, stem + PluImageFileSuffix),
-                    Path.Combine(pluDirectory, stem + PluAllFileSuffix)
+                    Path.Combine(pdfOutputDirectory, XyFileName),
+                    Path.Combine(pdfOutputDirectory, XyImageTextFileName),
+                    Path.Combine(pdfOutputDirectory, TableFileName),
+                    Path.Combine(pdfOutputDirectory, PluTextFileName),
+                    Path.Combine(pdfOutputDirectory, PluLayoutFileName),
+                    Path.Combine(pdfOutputDirectory, PluTableFileName),
+                    Path.Combine(pdfOutputDirectory, PluImageFileName),
+                    Path.Combine(pdfOutputDirectory, PluAllFileName)
                 };
 
                 bool allExist = true;
@@ -273,7 +282,7 @@ namespace MSIFAITOOLS.Services
 
                     if (missing != null && missing.Count < 20)
                     {
-                        missing.Add(Path.GetFileName(path));
+                        missing.Add(stem + "\\" + Path.GetFileName(path));
                     }
                 }
 
@@ -302,24 +311,15 @@ namespace MSIFAITOOLS.Services
                 throw new InvalidOperationException("该文件夹中没有找到 PDF 文件！");
             }
 
-            // 所有输出集中到 <PDF 文件夹>\AppData 下（不存在时自动创建），避免污染所选文件夹根目录
-            string outputRoot = Path.Combine(folder, OutputRootFolderName);
-            string xyDirectory;
-            string tableDirectory;
-            string pluDirectory;
-            string classifyDirectory;
-            GetOutputDirectories(folder, out xyDirectory, out tableDirectory, out pluDirectory,
-                out classifyDirectory);
+            // 所有输出集中到 <PDF 文件夹>\AiAppData 下（不存在时自动创建），避免污染所选文件夹根目录
+            string outputRoot = GetOutputRoot(folder);
+            string classifyDirectory = GetClassifyDirectory(outputRoot);
             Directory.CreateDirectory(outputRoot);
-            Directory.CreateDirectory(xyDirectory);
-            Directory.CreateDirectory(tableDirectory);
-            Directory.CreateDirectory(pluDirectory);
             Directory.CreateDirectory(classifyDirectory);
 
             ReportLog(onLog, LogKind.Info, "输出根目录：" + outputRoot);
-            ReportLog(onLog, LogKind.Info, "坐标输出目录：" + xyDirectory);
-            ReportLog(onLog, LogKind.Info, "表格输出目录：" + tableDirectory);
-            ReportLog(onLog, LogKind.Info, "plu 输出目录：" + pluDirectory);
+            ReportLog(onLog, LogKind.Info,
+                string.Format("每个 PDF 输出到：{0}{1}<図番号>{1}", outputRoot, Path.DirectorySeparatorChar));
             ReportLog(onLog, LogKind.Info, "分类结果目录：" + classifyDirectory);
 
             List<string> errors = new List<string>();
@@ -330,8 +330,12 @@ namespace MSIFAITOOLS.Services
             {
                 string fileName = pdfNames[index];
                 string pdfPath = Path.Combine(folder, fileName);
-                // 図番号 = PDF 文件名（不含扩展名）
+                // 図番号 = PDF 文件名（不含扩展名），同时作为输出子文件夹名
                 string stem = Path.GetFileNameWithoutExtension(fileName);
+
+                // 每个 PDF 一个独立子文件夹：<输出根目录>\<図番号>
+                string pdfOutputDirectory = GetPdfOutputDirectory(outputRoot, stem);
+                Directory.CreateDirectory(pdfOutputDirectory);
 
                 ReportProgress(onProgress, new PdfSplitProgress(index + 1, total, fileName, "正在处理"));
                 ReportLog(onLog, LogKind.Info,
@@ -342,7 +346,7 @@ namespace MSIFAITOOLS.Services
                 // 1) 文字 + 坐标（替代 PyMuPDF）
                 if (!RunStep(onLog, errors, fileName, "坐标提取 (PdfPig)", delegate
                     {
-                        PdfTextExtractor.WriteWordCoordinates(pdfPath, Path.Combine(xyDirectory, stem + XyFileSuffix));
+                        PdfTextExtractor.WriteWordCoordinates(pdfPath, Path.Combine(pdfOutputDirectory, XyFileName));
                     }))
                 {
                     failed = true;
@@ -352,7 +356,7 @@ namespace MSIFAITOOLS.Services
                 if (!RunStep(onLog, errors, fileName, "图面文字提取 (PdfPig)", delegate
                     {
                         PdfTextExtractor.WriteImageTextCoordinates(pdfPath,
-                            Path.Combine(xyDirectory, stem + XyImageTextFileSuffix));
+                            Path.Combine(pdfOutputDirectory, XyImageTextFileName));
                     }))
                 {
                     failed = true;
@@ -361,7 +365,7 @@ namespace MSIFAITOOLS.Services
                 // 3) 表格（替代 MarkItDown 的表格输出：单元格以 “|” 分隔）
                 if (!RunStep(onLog, errors, fileName, "表格提取 (PdfPig)", delegate
                     {
-                        PdfTextExtractor.WriteTableText(pdfPath, Path.Combine(tableDirectory, stem + TableFileSuffix));
+                        PdfTextExtractor.WriteTableText(pdfPath, Path.Combine(pdfOutputDirectory, TableFileName));
                     }))
                 {
                     failed = true;
@@ -372,11 +376,11 @@ namespace MSIFAITOOLS.Services
                     {
                         PdfTextExtractor.WritePluSet(
                             pdfPath,
-                            Path.Combine(pluDirectory, stem + PluTextFileSuffix),
-                            Path.Combine(pluDirectory, stem + PluLayoutFileSuffix),
-                            Path.Combine(pluDirectory, stem + PluTableFileSuffix),
-                            Path.Combine(pluDirectory, stem + PluAllFileSuffix),
-                            Path.Combine(pluDirectory, stem + PluImageFileSuffix));
+                            Path.Combine(pdfOutputDirectory, PluTextFileName),
+                            Path.Combine(pdfOutputDirectory, PluLayoutFileName),
+                            Path.Combine(pdfOutputDirectory, PluTableFileName),
+                            Path.Combine(pdfOutputDirectory, PluAllFileName),
+                            Path.Combine(pdfOutputDirectory, PluImageFileName));
                     }))
                 {
                     failed = true;
@@ -407,21 +411,21 @@ namespace MSIFAITOOLS.Services
 
             // 分解完成后按図番号规则分类（分类失败不影响分解结果）
             IList<PdfClassification> classifications =
-                ClassifyAll(folder, pdfNames, pluDirectory, classifyDirectory, onLog);
+                ClassifyAll(folder, pdfNames, outputRoot, classifyDirectory, onLog);
 
-            return new PdfSplitResult(total, succeeded, errors, xyDirectory, tableDirectory, pluDirectory,
-                classifyDirectory, classifications);
+            return new PdfSplitResult(total, succeeded, errors, outputRoot, classifyDirectory,
+                classifications);
         }
 
         /// <summary>对本次处理的 PDF 分类，写出汇总 CSV，并把每项结果写入日志。</summary>
-        private static IList<PdfClassification> ClassifyAll(string folder, string[] pdfNames, string pluDirectory,
+        private static IList<PdfClassification> ClassifyAll(string folder, string[] pdfNames, string outputRoot,
             string classifyDirectory, Action<LogKind, string> onLog)
         {
             IList<PdfClassification> items;
 
             try
             {
-                items = PdfClassifier.ClassifyFiles(folder, pdfNames, pluDirectory);
+                items = PdfClassifier.ClassifyFiles(folder, pdfNames, outputRoot);
             }
             catch (Exception ex)
             {

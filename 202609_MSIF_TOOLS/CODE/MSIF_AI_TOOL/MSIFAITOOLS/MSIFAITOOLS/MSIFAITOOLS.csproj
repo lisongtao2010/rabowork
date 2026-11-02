@@ -78,6 +78,7 @@
     <Compile Include="WindowLayoutHelper.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Services\PdfSplitService.cs" />
+    <Compile Include="Services\CadPartSplitterRunner.cs" />
     <Compile Include="Services\PdfTextExtractor.cs" />
     <Compile Include="Services\PdfLayoutAnalyzer.cs" />
     <Compile Include="Services\PdfTextSelection.cs" />
@@ -93,6 +94,9 @@
     <Compile Include="Services\AiPartAnalyzer.cs" />
     <Compile Include="Services\PartBasicInfoRepository.cs" />
     <Compile Include="Services\PartAnalysisService.cs" />
+    <Compile Include="Services\PartCoordinateVerifier.cs" />
+    <Compile Include="Services\CmdPartAnalyzer.cs" />
+    <Compile Include="Services\CmdPartAnalysisService.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

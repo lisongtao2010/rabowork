@@ -33,7 +33,6 @@
         },
         "frameworks": {
           "net48": {
-            "framework": "net48",
             "projectReferences": {}
           }
         },
@@ -45,7 +44,6 @@
       },
       "frameworks": {
         "net48": {
-          "framework": "net48",
           "dependencies": {
             "PdfPig": {
               "target": "Package",

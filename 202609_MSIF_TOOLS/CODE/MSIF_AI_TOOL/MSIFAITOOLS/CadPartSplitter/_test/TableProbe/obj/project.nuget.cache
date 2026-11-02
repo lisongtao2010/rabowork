@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "dgSpecHash": "pDLBryQUp9M=",
+  "success": true,
+  "projectFilePath": "D:\\Github_lis2010\\rabowork\\202609_MSIF_TOOLS\\CODE\\MSIF_AI_TOOL\\MSIFAITOOLS\\CadPartSplitter\\_test\\TableProbe\\TableProbe.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\11043787\\.nuget\\packages\\pdfpig\\0.1.9\\pdfpig.0.1.9.nupkg.sha512"
+  ],
+  "logs": []
+}

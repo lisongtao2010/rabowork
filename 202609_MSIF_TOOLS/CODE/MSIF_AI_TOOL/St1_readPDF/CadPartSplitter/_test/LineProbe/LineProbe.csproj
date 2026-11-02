@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <NoWarn>CS0168;CS0219</NoWarn>
+    <AssemblyName>LineProbe</AssemblyName>
+    <LangVersion>7.3</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="PdfPig" Version="0.1.9" />
+  </ItemGroup>
+
+  <!--
+    框线诊断探针：把「某个像素窗口里到底有哪些矢量路径 / 哪些横线」原样打出来，
+    用来查「表格多出一行 / 少一行」这类几何问题。
+    链接主工程的源文件，横线判定与 RuledTableExtractor 完全一致。
+  -->
+  <ItemGroup>
+    <Compile Include="..\..\RuledTable.cs" Link="Linked\RuledTable.cs" />
+    <Compile Include="..\..\RuledTableExtractor.cs" Link="Linked\RuledTableExtractor.cs" />
+    <Compile Include="..\..\RuledTableWriter.cs" Link="Linked\RuledTableWriter.cs" />
+    <Compile Include="..\..\CsvFile.cs" Link="Linked\CsvFile.cs" />
+    <Compile Include="..\..\DetectorOptions.cs" Link="Linked\DetectorOptions.cs" />
+  </ItemGroup>
+
+</Project>

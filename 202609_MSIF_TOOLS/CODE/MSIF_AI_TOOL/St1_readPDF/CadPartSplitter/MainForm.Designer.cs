@@ -27,6 +27,7 @@ namespace CadPartSplitter
             this.lblInputFile = new System.Windows.Forms.Label();
             this.txtInput = new System.Windows.Forms.TextBox();
             this.btnBrowseInput = new System.Windows.Forms.Button();
+            this.btnBrowseFolder = new System.Windows.Forms.Button();
             this.lblOutputDir = new System.Windows.Forms.Label();
             this.txtOutput = new System.Windows.Forms.TextBox();
             this.btnBrowseOutput = new System.Windows.Forms.Button();
@@ -95,6 +96,7 @@ namespace CadPartSplitter
             this.grpInput.Controls.Add(this.lblInputFile);
             this.grpInput.Controls.Add(this.txtInput);
             this.grpInput.Controls.Add(this.btnBrowseInput);
+            this.grpInput.Controls.Add(this.btnBrowseFolder);
             this.grpInput.Controls.Add(this.lblOutputDir);
             this.grpInput.Controls.Add(this.txtOutput);
             this.grpInput.Controls.Add(this.btnBrowseOutput);
@@ -114,7 +116,7 @@ namespace CadPartSplitter
             this.lblInputFile.Name = "lblInputFile";
             this.lblInputFile.Size = new System.Drawing.Size(68, 17);
             this.lblInputFile.TabIndex = 0;
-            this.lblInputFile.Text = "输入文件：";
+            this.lblInputFile.Text = "输入路径：";
             // 
             // txtInput
             // 
@@ -123,19 +125,28 @@ namespace CadPartSplitter
             this.txtInput.BackColor = System.Drawing.Color.White;
             this.txtInput.Location = new System.Drawing.Point(96, 26);
             this.txtInput.Name = "txtInput";
-            this.txtInput.ReadOnly = true;
-            this.txtInput.Size = new System.Drawing.Size(660, 23);
+            this.txtInput.Size = new System.Drawing.Size(540, 23);
             this.txtInput.TabIndex = 1;
             // 
             // btnBrowseInput
             // 
             this.btnBrowseInput.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
-            this.btnBrowseInput.Location = new System.Drawing.Point(770, 24);
+            this.btnBrowseInput.Location = new System.Drawing.Point(646, 24);
             this.btnBrowseInput.Name = "btnBrowseInput";
             this.btnBrowseInput.Size = new System.Drawing.Size(100, 26);
             this.btnBrowseInput.TabIndex = 2;
             this.btnBrowseInput.Text = "浏览…";
             this.btnBrowseInput.UseVisualStyleBackColor = true;
+            //
+            // btnBrowseFolder
+            //
+            this.btnBrowseFolder.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.btnBrowseFolder.Location = new System.Drawing.Point(756, 24);
+            this.btnBrowseFolder.Name = "btnBrowseFolder";
+            this.btnBrowseFolder.Size = new System.Drawing.Size(114, 26);
+            this.btnBrowseFolder.TabIndex = 3;
+            this.btnBrowseFolder.Text = "选择文件夹…";
+            this.btnBrowseFolder.UseVisualStyleBackColor = true;
             // 
             // lblOutputDir
             // 
@@ -143,7 +154,7 @@ namespace CadPartSplitter
             this.lblOutputDir.Location = new System.Drawing.Point(14, 59);
             this.lblOutputDir.Name = "lblOutputDir";
             this.lblOutputDir.Size = new System.Drawing.Size(68, 17);
-            this.lblOutputDir.TabIndex = 3;
+            this.lblOutputDir.TabIndex = 4;
             this.lblOutputDir.Text = "输出目录：";
             // 
             // txtOutput
@@ -153,7 +164,7 @@ namespace CadPartSplitter
             this.txtOutput.Location = new System.Drawing.Point(96, 56);
             this.txtOutput.Name = "txtOutput";
             this.txtOutput.Size = new System.Drawing.Size(660, 23);
-            this.txtOutput.TabIndex = 4;
+            this.txtOutput.TabIndex = 5;
             // 
             // btnBrowseOutput
             // 
@@ -161,7 +172,7 @@ namespace CadPartSplitter
             this.btnBrowseOutput.Location = new System.Drawing.Point(770, 54);
             this.btnBrowseOutput.Name = "btnBrowseOutput";
             this.btnBrowseOutput.Size = new System.Drawing.Size(100, 26);
-            this.btnBrowseOutput.TabIndex = 5;
+            this.btnBrowseOutput.TabIndex = 6;
             this.btnBrowseOutput.Text = "浏览…";
             this.btnBrowseOutput.UseVisualStyleBackColor = true;
             // 
@@ -485,6 +496,7 @@ namespace CadPartSplitter
         private System.Windows.Forms.Label lblInputFile;
         private System.Windows.Forms.TextBox txtInput;
         private System.Windows.Forms.Button btnBrowseInput;
+        private System.Windows.Forms.Button btnBrowseFolder;
         private System.Windows.Forms.Label lblOutputDir;
         private System.Windows.Forms.TextBox txtOutput;
         private System.Windows.Forms.Button btnBrowseOutput;

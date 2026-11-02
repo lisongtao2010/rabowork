@@ -1,0 +1,21 @@
+{
+  "source": "D:\\Github_lis2010\\rabowork\\202609_MSIF_TOOLS\\図面-20260918T025344Z-1-001\\図面\\H310C10037.pdf",
+  "page": 1,
+  "dpi": 300,
+  "image": { "w": 3508, "h": 2479 },
+  "table_start_x": 3036,
+  "word_count": 101,
+  "outside_word_count": 2,
+  "table_word_count": 0,
+  "other_word_count": 2,
+  "tables": [
+  ],
+  "other_words": [
+    { "text": "注）1．加工図内の形材番号は最終枝番を使用する事。",
+      "pixel": { "x": 1035, "y": 1385, "w": 1018, "h": 36 },
+      "pdf_mm": { "x": 87.63, "y": 117.26, "w": 86.19, "h": 3.05 } },
+    { "text": "【躯体取付孔ピッチ図】",
+      "pixel": { "x": 103, "y": 1537, "w": 421, "h": 37 },
+      "pdf_mm": { "x": 8.72, "y": 130.13, "w": 35.64, "h": 3.13 } }
+  ]
+}

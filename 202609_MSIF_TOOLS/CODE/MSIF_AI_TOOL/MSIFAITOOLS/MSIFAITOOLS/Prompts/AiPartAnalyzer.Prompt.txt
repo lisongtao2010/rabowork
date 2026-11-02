@@ -18,8 +18,13 @@
 #   {{COORDINATE_TEXT}}  表格所在页的文字坐标片段
 # 条件块：
 #   {{#COORDINATE}} ... {{/COORDINATE}}
-#   只有存在坐标文件（*_xy.txt）时才输出块内文字，否则整块删除。
+#   只有存在坐标文件（xy.txt）时才输出块内文字，否则整块删除。
 #
+# 真实对话示例（实测抓取的 system / user 原文 + AI 回复 + 解析结果）见：
+#   项目根目录\AiPartAnalyzer.Prompt_真实对话示例.md
+#   需要重新抓取某份图纸的对话内容时，运行 Tools\dump_ai_prompt.ps1 -PdfPath <pdf 路径>
+#
+
 # 注意：
 #   - 第一个分节之前的 # 行是注释；分节内的一律当作提示语原文。
 #   - 保存编码请使用 UTF-8。

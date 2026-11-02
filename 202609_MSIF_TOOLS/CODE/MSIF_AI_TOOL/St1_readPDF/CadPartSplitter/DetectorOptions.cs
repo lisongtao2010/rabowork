@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 
 namespace CadPartSplitter
 {
@@ -263,12 +264,250 @@ namespace CadPartSplitter
         /// </summary>
         public bool SplitTextToWords { get; set; } = true;
 
+        // ── 有线表格内容提取（单元格四面都有框线的表格）─────────────────────
+
+        /// <summary>
+        /// 是否从 PDF 矢量路径提取「有线表格」（单元格四面都被框线围住的表）内容并落盘
+        /// （默认开启，仅 PDF 生效；位图没有矢量路径，自动跳过）。
+        ///
+        /// 与 <see cref="MaskTableBlocks"/>（按文字层推断表格块、只用于遮蔽）不同：
+        /// 本开关走的是「只认框线」的准确路径 —— 横 / 竖框线围出的最小闭合矩形就是单元格，
+        /// 相邻单元格按共用边界并成表，行列号与合并跨度都由几何位置决定，
+        /// 因此空单元格不会错位、合并单元格也不会被拆列。
+        ///
+        /// 产物（写在 <see cref="OutputDirectory"/>）：
+        ///   · <c>tables_info.json</c> ── 机器可读，与 <c>outside_info.json</c> 同构；
+        ///   · <c>tables_text.txt</c>  ── 人眼可读，含框线画的二维表 + 单元格明细；
+        ///   · <c>tables\table_NN.csv</c> ── Excel 可直接打开的表格内容。
+        /// 只读，不影响零件框选 / 合并 / 命名。命令行对应 `--no-tables`。
+        /// </summary>
+        public bool ExtractRuledTables { get; set; } = true;
+
+        /// <summary>
+        /// 判定为表格框线所需的最短长度（毫米，默认 2.0）。
+        ///
+        /// 用来筛掉不是框线的短边：填充细矩形在线宽方向的两条短边（0.2~0.5mm）、
+        /// 文字笔画、箭头、标注短线。表格线每一段至少有一个单元格那么长
+        /// （格子边长 ≥ <see cref="RuledTableMinCellMm"/>），所以 2mm 不会误伤真框线。
+        /// 图上有特别细密的表格（格子 &lt; 2mm）时才需要调小，但要同时调小
+        /// <see cref="RuledTableMinCellMm"/>，否则形状闭合了也会被当噪声丢掉。
+        /// </summary>
+        public double RuledTableMinLineMm { get; set; } = 2.0;
+
+        /// <summary>
+        /// 共线容差（毫米，默认 0.6）：固定坐标（横线的 y / 竖线的 x）相差在此范围内、
+        /// 且区间重叠或间隙也在容差内的线段，视为同一条框线并合并。
+        ///
+        /// CAD 导出的图纸上，同一条表格线常被画两遍（上一格的底边 + 下一格的顶边），
+        /// 粗线还会变成「0.2mm 高的填充四边形」（两条长边相距 0.2mm）。
+        /// 调大能把略有错位的框线并到一起；过大（&gt; 行高的 1/4）会把相邻两行并成一行。
+        /// </summary>
+        public double RuledTableLineToleranceMm { get; set; } = 0.6;
+
+        /// <summary>
+        /// 单元格最小边长（毫米，默认 2.0）：横 / 竖两边间距小于此值的候选矩形不认。
+        /// 用来忽略重叠框线之间、粗框线内部被围出来的窄缝（0.2~1mm 宽），
+        /// 避免一个格子被拆成一串细条。
+        /// </summary>
+        public double RuledTableMinCellMm { get; set; } = 2.0;
+
+        /// <summary>
+        /// 上下两条横线能配成一个单元格的最大间距（毫米，默认 120）。
+        ///
+        /// 合并单元格（特别是纵向跨多行的表題欄栏杆）只有上下两条长横线，
+        /// 中间没有横线可依，所以这个上限要大于最高的合并单元格。
+        /// 调大能容纳更高的合并格，但枚举量随带内横线数增长，过大只是变慢、不影响正确性。
+        /// </summary>
+        public double RuledTableMaxRowGapMm { get; set; } = 120.0;
+
+        /// <summary>
+        /// 是否在表格 CSV 生成之后，再合成下游 AI 环节约定的 <c>LT_STEP1.csv</c>（默认开启）。
+        ///
+        /// 做法：遍历 <c>tables\table_NN.csv</c> ——
+        ///   · 表头同时含「番号」「部品名」「部品コード」的是部品表（主表），取它的明细行；
+        ///   · 明细行里「部品コード」写「下表参照」的，往后找第一张含「部品コード」列的参照表
+        ///     （图纸上位于下方的那张小表），它有 N 条明细就把这一行拆成 N 条，
+        ///     只把「部品コード」换成参照表里的值，其余列沿用原行；
+        ///   · 合成结果按 <see cref="OutputDirectory"/> 写成 <c>LT_STEP1.csv</c>（带 BOM 的 UTF-8）。
+        /// 找不到部品表、或没有「下表参照」行时什么都不写（只记日志）。命令行对应 `--no-lt-step1`。
+        /// </summary>
+        public bool BuildLtStep1Table { get; set; } = true;
+
+        /// <summary>
+        /// 是否把「品種 + 多列重复」的表格摊平，合成下游 AI 环节约定的 <c>LT_STEP2.csv</c>（默认开启）。
+        ///
+        /// 图纸上这类表把同一个品種的几组部品横向排开，表头重复出现：
+        /// <code>
+        /// 品種,部品名 ： 縦枠上部スペーサー,,部品名 ： 小縦枠上部スペーサー,,
+        /// ,部品コード,員数,部品コード,員数
+        /// 片引戸,MEACC428,1,MEACC428,2
+        /// </code>
+        /// 做法：遍历 <c>tables\table_NN.csv</c> ——
+        ///   · 表头区里有含「品種」的单元格，且同一列名重复出现 ≥ 2 次的是品種表；
+        ///   · 重复列名每次出现的列 = 一组部品ブロック，块标题（上方单元格里的「部品名 ： …」）就是品名；
+        ///   · 摊平成 品種 / 部品名 / 部品コード / 員数 四列，品種按合并单元格往下填满；
+        ///   · 结果按 <see cref="OutputDirectory"/> 写成 <c>LT_STEP2.csv</c>（带 BOM 的 UTF-8）。
+        /// 找不到这种表时什么都不写（只记日志）。命令行对应 `--no-lt-step2`。
+        /// </summary>
+        public bool BuildLtStep2Table { get; set; } = true;
+
         // ── 输出 ─────────────────────────────────────────────────────────────
 
         /// <summary>
-        /// 分割零件图的输出目录，不存在时自动创建。
+        /// AI 流程约定的输出文件夹名，放在所选图纸所在目录下；其内每张图纸再单独占一个
+        /// 「图纸名」子文件夹（<c>&lt;图纸目录&gt;\AiAppData\&lt;图纸名&gt;</c>）。
+        /// 下游 AI 环节按「目录 + 图纸名」直接取分割结果，不用再问「结果输出到哪儿了」。
         /// </summary>
-        public string OutputDirectory { get; set; } = "output";
+        public const string AiAppDataFolderName = "AiAppData";
+
+        /// <summary>
+        /// 由输入文件推导默认输出目录（按第 1 页算）：
+        /// <c>&lt;输入文件所在目录&gt;\AiAppData\&lt;主文件名&gt;</c>。
+        /// </summary>
+        public static string GetDefaultOutputDirectory(string inputFile)
+        {
+            return GetDefaultOutputDirectory(inputFile, 0);
+        }
+
+        /// <summary>
+        /// 由输入文件推导默认输出目录：<c>&lt;输入文件所在目录&gt;\AiAppData\&lt;主文件名&gt;</c>。
+        ///
+        /// 图形界面选好文件后自动填这个路径，命令行不写输出目录时也用它，
+        /// 这样「选了 <c>D:\图纸\H310A20009.pdf</c>」结果就固定落在
+        /// <c>D:\图纸\AiAppData\H310A20009\</c>，同一目录下的多张图纸互不覆盖。
+        ///
+        /// 多页 PDF 逐页分割时，第 2 页起自动加 <c>_P页号</c> 后缀（如
+        /// <c>H310A20009_P2</c>），避免后一页覆盖前一页的结果；
+        /// 取不到文件名时（路径以 <c>\</c> 结尾、输入框里还是半截路径）退回 <c>AiAppData</c> 本身。
+        /// </summary>
+        /// <param name="inputFile">输入文件路径。</param>
+        /// <param name="pageIndex">PDF 页码（0 起）；0 即第 1 页，不加后缀。</param>
+        public static string GetDefaultOutputDirectory(string inputFile, int pageIndex)
+        {
+            string dir = null;
+
+            if (!string.IsNullOrWhiteSpace(inputFile))
+            {
+                try
+                {
+                    // 界面上可能还在输入半截路径，取不到绝对路径就退回当前目录
+                    dir = Path.GetDirectoryName(Path.GetFullPath(inputFile));
+                }
+                catch (ArgumentException)
+                {
+                    dir = null;
+                }
+                catch (NotSupportedException)
+                {
+                    dir = null;
+                }
+                catch (PathTooLongException)
+                {
+                    dir = null;
+                }
+            }
+
+            if (string.IsNullOrEmpty(dir))
+                dir = Environment.CurrentDirectory;
+
+            string root = Path.Combine(dir, AiAppDataFolderName);
+            string drawingFolder = BuildDrawingFolderName(inputFile, pageIndex);
+            return string.IsNullOrEmpty(drawingFolder) ? root : Path.Combine(root, drawingFolder);
+        }
+
+        /// <summary>
+        /// 批量模式：由输入文件夹推导默认的输出根目录 <c>&lt;输入文件夹&gt;\AiAppData</c>。
+        ///
+        /// 与单文件的 <see cref="GetDefaultOutputDirectory(string, int)"/> 落在同一个上级目录，
+        /// 区别只是不再拼「图纸名」—— 批量时每张图纸各自一个子文件夹
+        /// （<c>&lt;输入文件夹&gt;\AiAppData\&lt;图纸名&gt;</c>），由
+        /// <see cref="BatchRunner"/> 按 <see cref="GetDrawingFolderName"/> 逐个补齐。
+        /// </summary>
+        /// <param name="inputDirectory">输入文件夹路径。</param>
+        public static string GetDefaultBatchOutputDirectory(string inputDirectory)
+        {
+            string dir = null;
+
+            if (!string.IsNullOrWhiteSpace(inputDirectory))
+            {
+                try
+                {
+                    dir = Path.GetFullPath(inputDirectory);
+                }
+                catch (ArgumentException)
+                {
+                    dir = null;
+                }
+                catch (NotSupportedException)
+                {
+                    dir = null;
+                }
+                catch (PathTooLongException)
+                {
+                    dir = null;
+                }
+            }
+
+            if (string.IsNullOrEmpty(dir))
+                dir = Environment.CurrentDirectory;
+
+            return Path.Combine(dir, AiAppDataFolderName);
+        }
+
+        /// <summary>
+        /// 取「图纸名」子文件夹名（批量模式给每个 PDF 分目录时用）：
+        /// 主文件名（不含扩展名）；页码 &gt; 0 时补 <c>_P&lt;页码+1&gt;</c>。
+        /// 取不到文件名时返回 null，调用方直接用输出根目录。
+        /// </summary>
+        /// <param name="inputFile">输入文件路径。</param>
+        /// <param name="pageIndex">PDF 页码（0 起）；0 即第 1 页，不加后缀。</param>
+        public static string GetDrawingFolderName(string inputFile, int pageIndex)
+        {
+            return BuildDrawingFolderName(inputFile, pageIndex);
+        }
+
+        /// <summary>
+        /// 取「图纸名」子文件夹名：主文件名（不含扩展名）；页码 &gt; 0 时补 <c>_P&lt;页码+1&gt;</c>。
+        /// 非法文件名字符替换为下划线（正常路径不会出现，防御手工拼的字符串）。
+        /// 取不到文件名时返回 null，调用方退回 <see cref="AiAppDataFolderName"/> 本身。
+        /// </summary>
+        private static string BuildDrawingFolderName(string inputFile, int pageIndex)
+        {
+            string name;
+
+            try
+            {
+                name = Path.GetFileNameWithoutExtension(inputFile);
+            }
+            catch (ArgumentException)
+            {
+                return null;
+            }
+            catch (NotSupportedException)
+            {
+                return null;
+            }
+            catch (PathTooLongException)
+            {
+                return null;
+            }
+
+            if (string.IsNullOrWhiteSpace(name))
+                return null;
+
+            name = name.Trim();
+            foreach (char invalid in Path.GetInvalidFileNameChars())
+                name = name.Replace(invalid, '_');
+
+            return pageIndex > 0 ? name + "_P" + (pageIndex + 1) : name;
+        }
+
+        /// <summary>
+        /// 分割零件图的输出目录，不存在时自动创建。
+        /// 留空（null / 空串）时取 <see cref="GetDefaultOutputDirectory(string, int)"/>，
+        /// 即 <c>&lt;输入文件所在目录&gt;\AiAppData\&lt;主文件名&gt;</c>。
+        /// </summary>
+        public string OutputDirectory { get; set; }
 
         /// <summary>
         /// 是否保存中间处理图（二值图、膨胀图）用于参数调试。

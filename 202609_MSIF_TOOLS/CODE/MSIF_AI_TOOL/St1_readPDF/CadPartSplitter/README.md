@@ -10,10 +10,16 @@
 
 ### 图形界面
 
-1. **输入文件**：点「浏览…」选择 `.pdf / .png / .jpg / .bmp / .tif`（也可直接把文件拖到窗口上）
-2. **输出目录**：选择图纸后自动填为 `<图纸名>_parts`，可手工修改
-3. **识别参数**：一般保持默认即可；识别效果不理想时按下表调整
-4. 点「开始分割」，日志面板会实时显示每一步进度，完成后状态栏提示零件数量
+1. **输入路径（文件 / 文件夹）**：点「浏览…」选单个 `.pdf / .png / .jpg / .bmp / .tif`，或点「选择文件夹…」选整个文件夹做批量
+   （也可直接把文件或文件夹拖到窗口上；**最省事的是把路径 `Ctrl+V` 粘到界面的「输入路径」框**，
+   支持资源管理器「复制为路径」带引号的 `"D:\図面"`、`file:///D:/図面` 形式，多行只取第一行，粘错误路径会在日志里提示）。
+   选 / 粘文件夹时按钮变成「开始批量处理」，逐张处理该文件夹下的所有 PDF；粘完直接按 <kbd>Enter</kbd> 也能开始
+2. **输出目录**：选择图纸后自动填为 `<图纸所在目录>\AiAppData\<图纸名>`（与下游 AI 环节约定的固定位置，每张图纸一个子文件夹），
+   选文件夹时自动填为 `<文件夹>\AiAppData`（每张图纸再各自一个子文件夹，树形结构与单张完全一致），都可手工修改或直接粘贴
+3. **识别参数**：一般保持默认即可；识别效果不理想时按下表调整（批量时同一套参数对每张图纸生效）
+4. 点「开始分割」（批量时为「开始批量处理」），日志面板会实时显示每一步进度，完成后状态栏 / 弹窗给出零件数量；
+   批量结束时弹窗汇总「成功 N 张 / 失败 M 张 / 零件合计」，单张失败不影响后面的图纸
+
 
 | 参数 | 默认 | 说明 |
 | --- | --- | --- |
@@ -22,19 +28,35 @@
 | 右侧遮蔽 | 0.50 | 屏蔽右侧 BOM 表/说明区。**开启「自动遮蔽」时仅作兜底比例** |
 | 自动遮蔽 | 开 | 自动定位表格/标题栏的起始列，按实际表格位置遮蔽。关掉则退回固定比例 |
 | 筛除表格残片 | 开 | 文字行合计面积占该块 ≥ 60% 的块判定为「不是零件图」（表題欄 / 変更履歴表等），直接丢弃 |
-| 最小面积 | 80000 | 轮廓面积阈值，滤掉孤立数字/噪线 |
+| 最小面积 | 25000 | 轮廓面积阈值，滤掉孤立数字/噪线 |
 | 扩展边距 | 30 | 裁切框四周留白，防止尺寸标注被切 |
-| 核宽度 / 核高度 | 80 / 25 | 形态学膨胀核，用于把同一零件的碎散图元聚合在一起 |
+| 核宽度 / 核高度 | 60 / 10 | 形态学膨胀核，用于把同一零件的碎散图元聚合在一起 |
 | 保存调试图 | 关 | 额外输出二值图、遮蔽图、膨胀图，便于定位参数问题 |
 
 > 文字清单的粒度（`parts_text.txt` 默认一个词一行）在界面上没有开关，固定为逐词；
 > 需要「同一水平线上的词拼成一句」时请改用命令行加 `--merge-text-lines`。
 
+> **参数自动记住**：界面上设的这套识别参数（DPI / 页码 / 遮蔽 / 面积 / 边距 / 核 / 三个开关）
+> 在点「开始分割」时和关闭窗口时写入 `%APPDATA%\CadPartSplitter\settings.ini`，
+> **下次启动自动读回**，不用每次重新调。删掉该文件即恢复默认值。
+> 写入位置不放在 exe 旁边，是因为本程序常被放进别的工程目录（可能只读）。
+
 ### 命令行
 
 ```
 CadPartSplitter.exe <输入文件> [输出目录] [选项]
+CadPartSplitter.exe <输入文件夹> [输出根目录] [选项]   ← 批量
 ```
+
+省略输出目录时写到 `<输入文件所在目录>\AiAppData\<图纸名>\`（与下游 AI 环节约定的固定位置，
+每张图纸一个子文件夹：例如 `D:\图纸\H310A20009.pdf` → `D:\图纸\AiAppData\H310A20009\`；
+多页 PDF 的第 2 页起为 `H310A20009_P2`，避免覆盖前一页结果）；显式给出输出目录则按给定路径。
+
+输入是**文件夹**时进入批量模式：逐张处理该文件夹下的所有 `*.pdf`（一个界面 / 一套参数跑完），
+每张图纸仍各自落到 `<输出根目录>\<图纸名>\`；输出根目录省略时取 `<输入文件夹>\AiAppData`
+（与单张的树形结构完全一致，下游 AI 环节不用区分单张还是批量）。
+批量时单张出错只记 `[ERROR]` 并继续后面的图纸，最后打印 `[DONE] 共 N 张：成功 / 失败 / 零件合计`；
+退出码 `2` 表示「有图纸处理失败」。
 
 | 选项 | 说明 |
 | --- | --- |
@@ -50,20 +72,85 @@ CadPartSplitter.exe <输入文件> [输出目录] [选项]
 | `--keep-text-heavy` | 保留文字行占比过高的块（默认丢弃表題欄 / 変更履歴表等表格残片） |
 | `--text-ratio <N>` | 文字行面积占比判定阈值（默认 0.60） |
 | `--merge-text-lines` | 文字清单按行合并（默认一个词一行，各自带自己的坐标） |
-| `--area <N>` | 最小轮廓面积（默认 80000） |
+| `--no-tables` | 关闭「有线表格内容提取」（不生成 `tables_info.json` / `tables_text.txt` / `tables\*.csv`） |
+| `--no-lt-step1` | 关闭「部品表下表参照展开」（不生成 `LT_STEP1.csv`） |
+| `--no-lt-step2` | 关闭「品種 × 多列重复表摊平」（不生成 `LT_STEP2.csv`） |
+| `--area <N>` | 最小轮廓面积（默认 25000） |
 | `--pad <N>` | 外接框扩展像素（默认 30） |
-| `--kw <N>` / `--kh <N>` | 膨胀核宽度 / 高度（默认 80 / 25） |
+| `--kw <N>` / `--kh <N>` | 膨胀核宽度 / 高度（默认 60 / 10） |
+| `--recursive` | 批量模式下连子文件夹一起处理（默认只看当前文件夹） |
 | `-h` / `--help` | 打印用法 |
 
 示例：
 
 ```
+CadPartSplitter.exe drawing.pdf                    （输出到 <图纸目录>\AiAppData\drawing）
+CadPartSplitter.exe D:\图纸\2026Q4                 （批量：处理该文件夹下所有 PDF → D:\图纸\2026Q4\AiAppData\<图纸名>）
+CadPartSplitter.exe D:\图纸\2026Q4 out --recursive  （批量含子文件夹，结果放 out\<图纸名>）
 CadPartSplitter.exe drawing.pdf output --debug
 CadPartSplitter.exe scan.png parts --mask 0.48 --area 50000 --fixed-mask
 CadPartSplitter.exe plan.pdf result --dpi 200 --kw 60 --kh 20
 ```
 
-退出码：`0` 成功（含「未检测到零件」）、`1` 输入文件不存在、`2` 处理异常。
+退出码：`0` 成功（含「未检测到零件」）、`1` 输入文件 / 文件夹不存在、`2` 处理异常（批量时为「有图纸处理失败」）。
+
+### 作为接口被其他程序调用（进程内）
+
+本程序集同时是一个可引用的类库：宿主工程**引用 `CadPartSplitter.exe`**（目标平台须同为 `x64`），
+一行即可完成分割——只要把「选择的文件路径」传进来：
+
+```csharp
+using CadPartSplitter;
+
+SplitResult result = SplitApi.Split(@"D:\图纸\H310A20009.pdf");
+
+if (result.Success)
+{
+    Console.WriteLine($"{result.PartCount} 个零件 → {result.OutputDirectory}");
+    foreach (PartInfo part in result.Parts)
+        Console.WriteLine($"{part.FileName}  像素({part.PixelX},{part.PixelY},{part.PixelW},{part.PixelH})");
+}
+else
+{
+    Console.WriteLine($"失败（退出码 {result.ExitCode}）：{result.ErrorMessage}");
+}
+```
+
+| 方法 | 说明 |
+| --- | --- |
+| `SplitApi.Split(string filePath)` | **最常用**：分割指定文件，结果写到 `<文件所在目录>\AiAppData\<主文件名>`，用默认识别参数 |
+| `SplitApi.Split(string filePath, string outputDirectory)` | 同上，另指定输出目录（传 `null` / `""` 退回默认位置） |
+| `SplitApi.Split(string filePath, DetectorOptions options)` | 高级：自定义参数 + 日志回调（`DetectorOptions.Logger`，本接口的日志也会一并回调） |
+| `SplitApi.SplitAsync(...)` | 上面三者的异步版本，WinForms / WPF 界面线程可直接 `await` |
+
+`SplitResult` 里能拿到：`Success`、`ExitCode`（0 成功 / 1 输入无效 / 2 处理异常，与命令行一致）、
+`PartCount`、`TableCount`、`OutputDirectory`、`Parts`（`PartInfo` 列表：像素坐标、PDF 毫米坐标、该图文字、圈号）、
+`Tables`（`RuledTable` 列表：有线表格的坐标 / 行列 / 逐单元格文字，PDF 输入才有）、
+`Message`、`ErrorMessage`、`Log`（本次处理的完整日志）、`ElapsedMilliseconds`。
+接口内部已把所有异常转成 `Success = false`，**不会向宿主抛异常**。
+PDF 输入还会在 `OutputDirectory` 里落两份后处理产物：`LT_STEP1.csv`（部品表「下表参照」展开后的部品明细，
+见下文「LT_STEP1.csv（部品表「下表参照」展开）」）与 `LT_STEP2.csv`（「品種 × 多列重复」表摊平后的部品明细，
+见下文「LT_STEP2.csv（品種 × 多列重复表摊平）」）—— 它们是文件产物，不在 `SplitResult` 里单独给属性。
+
+> 引用前提：本程序集是 **.NET Framework 4.8 + x64**（因为 PDFium / OpenCvSharp 的原生库是 x64），
+> 宿主工程须同样为 .NET Framework 4.x 且平台目标 `x64`；
+> 宿主若是 .NET 6/8 等新框架，请改用下面的命令行方式调用。
+
+想沿用界面里上次调好的那套参数：
+
+```csharp
+var opts = new DetectorOptions();
+GuiSettings.Load().ApplyTo(opts);   // 读 %APPDATA%\CadPartSplitter\settings.ini
+opts.OutputDirectory = null;        // 留空 = <文件所在目录>\AiAppData\<主文件名>
+var result = SplitApi.Split(filePath, opts);
+```
+
+> 想换了页再跑同一份 PDF（同一 `OutputDirectory`）会覆盖上一次的 `Part_NN.png`；
+> 多页图纸建议让输出目录留空，接口会自动加 `_P页号` 后缀区分各页。
+
+> 不想引用程序集也可以走命令行：`CadPartSplitter.exe "<文件路径>"`，
+> 退出码 + `<文件所在目录>\AiAppData\<图纸名>\` 下的结果文件就是调用结果。
+> 程序本体是 `WinExe`，**只有无参数启动才弹界面**；带参数启动不弹任何窗口。
 
 ## 处理流程
 
@@ -86,6 +173,13 @@ CadPartSplitter.exe plan.pdf result --dpi 200 --kw 60 --kh 20
    ↓ （仅 PDF，只读）读取文字层：框内文字 + 坐标 → texts / parts_text.txt
    ↓ （仅 PDF，只读）框外文字（表格 / 标题栏 / 页边注记）+ 表格行列结构 → outside_info.json / outside_text.txt
    ↓ （仅 PDF，只读）识别「圈号标注」：矢量路径里找整圆 + 文字层找圆内数字 → ①1、②2 … → callouts.txt
+   ↓ （仅 PDF，只读）有线表格：矢量路径取横 / 竖框线 → 剔除横穿文字的装饰横线 → 最小闭合矩形 = 单元格 → 相邻单元格成表
+        → tables_info.json / tables_text.txt / tables\table_NN.csv（部品表、型枠表、変更履歴表、表題欄）
+   ↓ （仅 PDF，只读）部品表后处理：部品コード 写「下表参照」的行 → 按下方参照表的明细条数展开
+        → LT_STEP1.csv（下游 AI 环节按这个文件名取部品明细）
+   ↓ （仅 PDF，只读）品種表整理：表头含「品種」且列名重复（多列并排的部品ブロック）→ 摊平成一行一个部品
+        → LT_STEP2.csv（品種 / 部品名 / 部品コード / 員数）
+
 ```
 
 每一步的原理、算法依据、参数影响与调参顺序，见 **[docs/分割原理.md](docs/分割原理.md)**。
@@ -123,20 +217,53 @@ CadPartSplitter.exe plan.pdf result --dpi 200 --kw 60 --kh 20
 
 ## 输出
 
+默认输出目录是所选图纸旁边的 `AiAppData\<图纸名>\`（界面 / 命令行都会自动推导，也可手工指定别的目录）：
+
 ```
-<输出目录>/
-├─ Part_01.png          # 按从上到下顺序编号的零件图
-├─ Part_02.png
-├─ parts_info.json      # 每个零件的像素坐标 + PDF 毫米坐标 + 该图上的文字及坐标
-├─ parts_text.txt       # 人眼可读的文字清单（每张图一节：图坐标 + 图上的文字，默认一个词一行；圈内的数字显示为 ①1）
-├─ callouts.txt         # 圈号标注清单（圆圈 + 圈内数字，①1 ②2 …，含圆心 / 半径 / 坐标）
-├─ outside_info.json    # 被分割部分以外：表格区「表→行→单元格」+ 其它未归属文字（含坐标）
-├─ outside_text.txt     # 人眼可读的「未分割区域文字清单」（表格按行列、注记逐词一行或按行合并）
-└─ debug_00_original.png   # 仅开启「保存调试图」时生成
-   debug_01_binary.png
-   debug_02_masked.png
-   debug_03_dilated.png
+<图纸所在目录>/
+├─ H310A20009.pdf          # 原图纸（不动）
+└─ AiAppData/
+   └─ H310A20009/          # 以图纸名命名，同目录多张图纸互不覆盖
+      ├─ Part_01.png          # 按从上到下顺序编号的零件图
+      ├─ Part_02.png
+      ├─ parts_info.json      # 每个零件的像素坐标 + PDF 毫米坐标 + 该图上的文字及坐标
+      ├─ parts_text.txt       # 人眼可读的文字清单（每张图一节：图坐标 + 图上的文字，默认一个词一行；圈内的数字显示为 ①1）
+      ├─ callouts.txt         # 圈号标注清单（圆圈 + 圈内数字，①1 ②2 …，含圆心 / 半径 / 坐标）
+      ├─ outside_info.json    # 被分割部分以外：表格区「表→行→单元格」+ 其它未归属文字（含坐标）
+      ├─ outside_text.txt     # 人眼可读的「未分割区域文字清单」（表格按行列、注记逐词一行或按行合并）
+      ├─ tables_info.json     # 有线表格（单元格四面都有框线）：每张表的坐标 / 行列数 / 逐单元格文字与跨度
+      ├─ tables_text.txt      # 同上的人眼可读版（框线画的二维表 + 单元格明细）
+      ├─ tables\              # 每张表一个 CSV，Excel 直接打开取值
+      │  ├─ table_01.csv
+      │  └─ table_02.csv
+      ├─ LT_STEP1.csv         # 部品表「下表参照」按参照表明细展开后的部品明细（下游 AI 环节按此文件名取）
+      ├─ LT_STEP2.csv         # 「品種 × 多列重复」表摊平后的部品明细（品種 / 部品名 / 部品コード / 員数）
+      └─ debug_00_original.png   # 仅开启「保存调试图」时生成
+         debug_01_binary.png
+         debug_02_masked.png
+         debug_03_dilated.png
 ```
+
+> 同一张图纸重复运行会覆盖自己那个子文件夹里的同名文件，**不会影响同目录其它图纸**。
+> 多页 PDF 逐页分割时，第 2 页起目录名为 `<图纸名>_P2`、`<图纸名>_P3`…，各页结果各自独立。
+
+批量模式（输入是文件夹）的树形结构与单张完全一致，只是多了一层「图纸」子文件夹：
+
+```
+<输入文件夹>/
+├─ H310A20009.pdf
+├─ H310B30001.pdf
+└─ AiAppData/                 # 批量默认的输出根目录（也可手工 / 命令行指定别处）
+   ├─ H310A20009/            # ← 与单张运行时的目录内容一模一样
+   │  ├─ Part_01.png
+   │  ├─ parts_info.json
+   │  └─ …
+   └─ H310B30001/
+      └─ …
+```
+
+> 下游 AI 环节因此**不需要区分单张 / 批量**：按 `<根目录>\<图纸名>\` 取文件即可。
+> 某张图纸处理失败时（例如文件损坏、页码超出页数），该图纸的日志标记为 `[ERROR]`，其它图纸照常处理完。
 
 ### parts_info.json（机器可读）
 
@@ -355,6 +482,231 @@ CadPartSplitter.exe plan.pdf result --dpi 200 --kw 60 --kh 20
 > 与 `parts_*` 一样只读文字层，位图输入不生成这两个文件。
 > 详见 [docs/分割原理.md](docs/分割原理.md) 3.9。
 
+## 有线表格内容提取（部品表 / 型枠表 / 表題欄）
+
+图纸上的表格（部品表、型枠表、変更履歴表、表題欄…）文字密、行列关系强，直接按「文字行」
+读会串行。这里改用**表格自己的框线**来定行列：单元格四面都被框线围住 → 单元格；相邻单元格
+共用边界 → 同一张表。
+
+```
+PDF 矢量路径（PdfPig ExperimentalAccess.Paths）
+   ↓ 只看描边线 + 细长实心矩形（CAD 把「粗线」画成细长填充四边形，两种画法都算框线）
+   ↓ 贝塞尔曲线先扁平化成折线；水平 / 竖直线段保留（长度 ≥ RuledTableMinLineMm 才要）
+   ↓ 共线线段合并（同一位置的断线接成一条，容差 RuledTableLineToleranceMm）
+   ↓ 剔除「假行线」：相距不到一个最小单元格、且夹出来的窄带横穿同一行文字的两条横线
+   ↓ 用横 / 竖两组线求「最小闭合矩形」→ 每个矩形就是一个单元格
+   ↓ 并查集把「共用边界」的单元格并成一张表
+   ↓ 文字层按坐标落进单元格（单元格中心命中，最小单元格优先 → 合并单元格里的字落在左上角格）
+```
+
+| 排除项 | 原因 |
+| --- | --- |
+| 面积 > 全页 25% 的矩形 | 图纸外框（图框）也算闭合矩形，但不是表格 |
+| 完全包住其它单元格的「容器格」 | 有些表把整表又套一层边框，那一层不算单元格 |
+| 相距 < 2mm、且横穿同一行文字的两条横线 | 画在文字上的装饰线 / 白涂线（不是格子的边），会把一格切成「比字还矮」的假行 |
+| 单元格 < 2 个 / 表内文字 < 2 个字符 | 单个方框（零件框、品番框）不是表格 |
+
+### 为什么要把「横穿文字的横线」剔掉（表題欄错行）
+
+CAD 图里除了格子边，偶尔还会有**画在文字上的装饰线**（下划线、白涂带）。它们同样是矢量横线，
+一旦被当成行边界，那一格就被切成几条「比字还矮」的窄带，表格凭空多出一行，文字掉进假行里，
+同一行的其它列（序号 / 图号）看起来就「错开了一行」。
+
+实图例子（`H310U10004.pdf` 表題欄，table_05 第 4 行）：
+
+```
+修前：行 4  D |（空）        | H310U10025      ← 两条装饰线把「項目」格切成 34/17/30px 三段
+     行 5    （空）| 枠 建て付け注意ラベル貼付要領図 |（空）
+     行 6    （空）|（空）        |（空）
+修后：行 4  D | 枠 建て付け注意ラベル貼付要領図 | H310U10025
+```
+
+判据很简单：**真框线永远不会横穿文字**（文字总是写在格子内部）。所以「两条横线都从同一个词的
+身高范围内穿过、且词中心在两条线的公共水平区间里、两条线相距 < `RuledTableMinCellMm`」时，
+这两条线一定是装饰线，两条一起丢掉 —— 丢掉之后上下两格自然并回一格，行列与实图一致。
+只丢「成对且窄」的组合，是为了不误伤「文字稍微顶到行线」的正常表格（那种情况两条线不会都压在
+同一个词上）。日志里能看到剔除条数：
+
+```
+[INFO] 表格框线：剔除 2 条横穿文字的装饰横线（两条相距 < 最小单元格 2mm，那条窄带装不下字，不可能是行边界）→ 横线剩 504 条
+```
+
+
+### tables_info.json（机器可读）
+
+UTF-8 无 BOM，`pixel` 为页面绝对像素、`pdf_mm` 为页面毫米坐标，结构与 `outside_info.json` 一致
+（`表 → rows[] → cells[]`），另给出 `row_span` / `column_span`：
+
+```json
+{
+  "page": 1,
+  "dpi": 300,
+  "source": "D:\\图纸\\H310U10004.pdf",
+  "tables": [
+    {
+      "name": "table_02",
+      "pixel": { "x": 8859, "y": 1418, "w": 720, "h": 246 },
+      "pdf_mm": { "x": 750.06, "y": 120.06, "w": 60.96, "h": 20.83 },
+      "row_count": 3,
+      "column_count": 2,
+      "cell_count": 6,
+      "text_cell_count": 6,
+      "rows": [
+        {
+          "index": 1,
+          "pixel": { "x": 8859, "y": 1418, "w": 720, "h": 82 },
+          "cells": [
+            {
+              "row": 1, "column": 1,
+              "row_span": 1, "column_span": 1,
+              "text": "見込み",
+              "word_count": 1,
+              "pixel": { "x": 8859, "y": 1418, "w": 360, "h": 82 },
+              "pdf_mm": { "x": 750.06, "y": 120.06, "w": 30.48, "h": 6.94 }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+### tables_text.txt（人眼可读）
+
+UTF-8 带 BOM。先用框线把表画出来（CJK 按两格宽对齐，单列超 32 格截断加省略号），
+再列单元格明细，便于核对坐标与合并情况。格子里的换行同样压成 `~`，
+所以框线二维表里「一格 = 一行」，不会被多行文字撑歪：
+
+```
+[table_02]  绝对(x=8859 y=1418 w=720 h=246)  mm(x=750.06 y=120.06 w=60.96 h=20.83)  行 3 / 列 2 / 单元格 6（有文字 6）
+  ┌──────────┬────────────┐
+  │ 見込み   │ 部品コード │
+  ├──────────┼────────────┤
+  │ NC95/115 │ MZA□968    │
+  ├──────────┼────────────┤
+  │ その他   │ MZA674     │
+  └──────────┴────────────┘
+
+  单元格明细：
+    行   1  y=1418  h=82     单元格 2
+      [行 1   列 1  ] x=8859  y=1418  w=360   h=82    見込み
+      [行 1   列 2  ] x=9219  y=1418  w=360   h=82    部品コード
+```
+
+### tables\table_NN.csv（Excel 取值）
+
+UTF-8 带 BOM、RFC 4180 转义（含逗号 / 引号的格子加引号）。**一格一列**：合并单元格的
+文字写在左上角那一格，被它覆盖的格子留空，所以行列号与图纸上的格线位置一一对应：
+
+```csv
+番号,部品名,枠区分,員数,基本寸法,切断寸法,部品コード
+1,ブレーキ部品,三方枠,2,-,-,MDU762
+2,鬼目ナット（ブレーキ取付用）,三方枠,4,-,-,MDT955
+```
+
+> **一格一行（换行压成 `~`）**：PDF 里一格写着两行字时（框内换行 / 折行），CSV 里不会出现
+> 真换行 —— 写出前先把字段内的换行压成 `~`（`CsvFile.SingleLine`，连续换行只留一个），
+> 例如 `部品セット` + 换行 + `三方枠` → `部品セット~三方枠`。这样「一条记录只占一行」，
+> Excel 双击打开不会串行，`ReadLines` / `awk -F,` 之类按行读的下游脚本也不会把一行拆成两行。
+> 同一份规则由 `tables\*.csv`、`LT_STEP1.csv`、`LT_STEP2.csv` 共用（都走 `CsvFile.Escape`）。
+
+> 实测 `H310U10004.pdf` 第 1 页（300 DPI）：5 张表 / 599 个单元格 / 554 格有文字，
+> 7 列 × 13 行的部品表逐格对齐，`番号 1~12` 的种类、員数、部品コード 全部正确；
+> 32 列 × 18 行的表題欄里 `D` / `枠 建て付け注意ラベル貼付要領図` / `H310U10025` 落在同一行。
+> 只读 PDF 矢量路径与文字层：位图 / 扫描件不生成这三个文件；`--no-tables` 可整体关闭。
+> 表題欄底部那几栏（縮尺 / 承認日）在 CAD 里常是「重叠文字 + 未闭合框线」，
+> 内容可能粘成一格，属预期限制 —— 部品表 / 型枠表不受影响。
+
+### LT_STEP1.csv（部品表「下表参照」展开）
+
+部品表里常有一行 `部品コード = 下表参照`：真正的品番写在表格下方那张小表里（一般是
+`見込み / 部品コード` 两列）。下游 AI 环节要「一个部品一条记录」，所以生成表格 CSV 之后
+再做一步展开，输出 `LT_STEP1.csv`：
+
+1. 按文件名顺序（`table_01` … `table_10`，已补零）遍历 `tables\*.csv`；
+2. **表头同时含「番号」「部品名」「部品コード」**的是部品表（主表）→ 取它的明细行（表头之后的行）；
+3. 明细行里「部品コード」含 **`下表参照`** → 往后找第一张「表头含 `部品コード` 列、且至少有一条明细」的表
+   （就是图纸上位于下方的那张「下表」）；
+4. 参照表有几条明细，这一行就**拆成几条**：`部品コード` 换成参照表的值，
+   `番号 / 部品名 / 枠区分 / 員数 / 基本寸法 / 切断寸法` 一律沿用原行 —— 同一个部品的多个变体共用番号；
+5. 找不到参照表 / 参照表没有有效品番 → 该行**原样保留**并写 `[WARN]`，不做猜测。
+
+实测 `H310U10004.pdf`：`table_01` 第 8 行「部品セット 三方枠」的部品コード 是 `下表参照`，
+下一张 `table_02` 是 `見込み / 部品コード` 两列共 2 条，于是这一行被拆成 2 条：
+
+```csv
+番号,部品名,枠区分,員数,基本寸法,切断寸法,部品コード
+1,ブレーキ部品,三方枠,2,-,-,MDU762
+7,取説,三方枠,1,-,-,MAP552
+8,部品セット,三方枠,1,-,-,MZA□968      ← table_02 第 1 行「NC95/115」的品番
+8,部品セット,三方枠,1,-,-,MZA674        ← table_02 第 2 行「その他」的品番
+9,ジョイント金具,下枠,C,-,-,MDQ703
+12,部品セット（埋込下枠）,下枠,F,-,-,MZA865
+```
+
+日志会把每次展开写清楚：
+
+```
+[INFO] LT_STEP1：table_01.csv 第 9 行（下表参照）→ table_02.csv 的 2 条部品コード：MZA□968 / MZA674
+[INFO] LT_STEP1：1 张主表 → 展开 2 行 → 共 13 条明细，已保存：<输出目录>\LT_STEP1.csv
+```
+
+> 编码与 `tables\*.csv` 一致：UTF-8 带 BOM、CRLF、RFC 4180 转义（Excel 双击直接可读）；
+> 从参照表搬过来的值同样按「一格一行」处理，格子里的换行已经压成 `~`。
+> 没有部品表（表头不含那三个词）时不生成文件，只记一行 `[INFO]`；`--no-lt-step1` 可关闭。
+> 参照表的 `見込み` 列不进 `LT_STEP1.csv`（下游按固定列取数），需要对照时看 `tables\table_NN.csv` 原表。
+> 只读 `tables\*.csv`，不改动任何已有产物。
+
+### LT_STEP2.csv（品種 × 多列重复表摊平）
+
+有些表把一个品種的几组部品**横向排开**，表头重复出现 —— 人看着清楚，机器不好取：
+
+```csv
+品種,部品名 ： 縦枠上部スペーサー,,部品名 ： 小縦枠上部スペーサー,,部品名 ： 縦枠下部スペーサー,,部品名 ： 小縦枠下部スペーサー,
+,部品コード,員数,部品コード,員数,部品コード,員数,部品コード,員数
+,,,,,,,,
+片引戸,MEACC428,1,MEACC428,2,MEA□□495,3,MEA□□495,4
+```
+
+这种表会被摊平成**一行一个部品**，写到 `LT_STEP2.csv`：
+
+```csv
+品種,部品名,部品コード,員数
+片引戸,縦枠上部スペーサー,MEACC428,1
+片引戸,小縦枠上部スペーサー,MEACC428,2
+片引戸,縦枠下部スペーサー,MEA□□495,3
+片引戸,小縦枠下部スペーサー,MEA□□495,4
+```
+
+判定与做法：
+
+1. 按文件名顺序遍历 `tables\*.csv`，在前 6 行里找**列名重复**的行（同一列名出现 ≥ 2 次）——
+   这一行就是块的子表头（`部品コード / 員数 / 部品コード / 員数 …`）；
+2. 同时还要在它及它上方找到含 **`品種`** 的列，两条都满足才算品種表
+   （型枠表的 `A / A員数 / B / B員数 …` 列名各不相同、`部品色展開表` 的 4 块没有品種列，都不会被动）；
+3. 重复列名每次出现的列 = 一组部品ブロック的起点，块宽到下一组起点为止；
+   块标题取该列上方单元格里的 `部品名 ： …`（自动去掉前缀）作为「部品名」，
+   块内的 `部品コード` 列取品番、`員数` 列取数量；
+4. 明细行里 `品種` 为空时沿用上一个（合并单元格在 CSV 里就是这样留空的）；块内品番为空的跳过，
+   表中间重复出现的表头行跳过；
+5. 每块有品番就出一条 → 固定 4 列（品種 / 部品名 / 部品コード / 員数）。
+
+日志：
+
+```
+[INFO] LT_STEP2：table_04.csv 是多列重复的品種表 → 摊平 4 条明细。
+[INFO] LT_STEP2：1 张品種表 → 共 4 条明细，已保存：<输出目录>\LT_STEP2.csv
+```
+
+> 多张品種表（`table_04`、`table_07` …）按文件名顺序**追加到同一个** `LT_STEP2.csv`，表头只写一次。
+> 编码与其它清单一致：UTF-8 带 BOM、CRLF、RFC 4180 转义（Excel 双击直接可读）；
+> 摊平搬过来的文字同样按「一格一行」处理，格子里的换行已经压成 `~`。
+> 没有这种表时不生成文件，只记一行 `[INFO]`；`--no-lt-step2` 可关闭。
+> 输出列固定为 品種 / 部品名 / 部品コード / 員数 —— 块里若还有 `備考` 之类的子列不进本文件
+> （需要时看 `tables\table_NN.csv` 原表）。
+> 只读 `tables\*.csv`，不改动任何已有产物。
+
 ## 排错
 
 - **检测不到零件**：日志会列出 4 项检查建议（遮蔽比例 / 面积阈值 / 膨胀核 / 调试图），先开「保存调试图」看 `debug_03_dilated.png` 是否把零件糊成了一整块。
@@ -375,22 +727,39 @@ CadPartSplitter.exe plan.pdf result --dpi 200 --kw 60 --kh 20
 - **圈号识别到一些不该有的（大孔、放大视图被当成圈）**：先把 `CalloutMaxRadiusMm` 调小（如 5~6mm），再必要时把 `CalloutRadiusTolerance` 调小（如 0.08）收紧圆度；实在干扰可用 `--no-callout` 整体关闭（不影响分割结果）。
 - **圈号有圈但没配上数字**：圈内数字若不是 1~3 位纯数字（例如 `A`、`イ`、`⑤` 这种已经在文字层里带圈的字符），本工具不会配对，属预期行为。
 - **`callouts.txt` 里识别出了圈号，`parts_text.txt` 里却还是裸数字**：说明那个数字词没在对应的零件图文字里定位到（日志 `[WARN] Part_NN.png：圈号 N 个，其中 M 个未在该图的文字中定位到圈内数字`）。常见原因是圈号跨在零件框边界上（该词按 50% 重叠率归到了零件图外）或数字被识别成非纯数字；此时以 `callouts.txt` / `parts_info.json` 的 `callouts` 为准。用 `--no-callout` 可完全关掉替换与清单。
+- **没有生成 `LT_STEP1.csv`**：先看日志 —— `未找到表头含「番号 / 部品名 / 部品コード」的表格` 说明这张图的部品表表头被识别成了别的字样（合并单元格把表头粘成一格、或图纸上根本没有部品表），可用 `tables\table_NN.csv` 逐个确认；`找不到可用的参照表` 说明「下表参照」后面没有可用的 `部品コード` 表（参照表在图纸上位于另一处 / 表头不含 `部品コード`），此时该行原样保留。已生成过又不想再要，用 `--no-lt-step1` 关闭。
+- **没有生成 `LT_STEP2.csv`**：日志出现 `未找到「含品種列且列名重复」的表格` 时，说明这张图里没有「表头含 `品種` + 同一列名重复出现」的表 —— 要么表头被识别成了别的字样（合并单元格把表头粘成一格），要么那张表不是这种横向并排的版式。用 `tables\table_NN.csv` 逐个确认表头；确认是这种表却没输出时，注意判定只看前 6 行（`LtStep2Builder.MaxHeaderScanRows`），表头被表題欄推得更低时需要调大。已生成过又不想再要，用 `--no-lt-step2` 关闭。
+- **`LT_STEP2.csv` 里「部品名」是空的**：块标题不在块起始列的正上方（合并单元格把标题写得偏左 / 偏右）。这时品名取不到，`部品コード` 与 `員数` 仍然正确；对照 `tables\table_NN.csv` 手工补，或把该表的标题行放到块起始列上方后重跑。
+- **没有生成 `tables_*` 文件**：日志出现 `表格内容：该页没有识别到有线表格` 时，先确认这张图上的表格确实是「四周都有框线」的表（只有横线的表、或用文字对齐凑出来的表识别不到）；扫描件 / 位图没有矢量路径，也不会生成。可用 `--no-tables` 的反面验证：不加该开关仍无输出，说明框线本身没被识别。
+- **表格被切成好几张 / 两张表粘成一张**：调 `DetectorOptions.RuledTableLineToleranceMm`（默认 0.6mm，共线断线合并的容差）。虚拟打印机出的 PDF 常有 0.1~0.3mm 的错位，容差太小会把一条线当成两条 → 表被切碎；太大（> 1mm）会把相邻两行并成一行。
+- **表格里出现异常大的「合并单元格」，文字粘成一串**：多为表題欄底部那种「框线没闭合 / 多处文字重叠」的栏位，属预期限制（部品表不受影响）；若整张表都这样，说明该表的框线是用「填充色块」而非线条画的，调 `RuledTableMinLineMm`（默认 2.0mm）可让更短的线也参与。
+- **表格里同一行的文字 / 图号错开一行（文字单独占一行，同一行其它列是空的）**：那格被「画在文字上的装饰横线」切成了几条比字还矮的窄带（CAD 里常见下划线 / 白涂带）。现已按「真框线不会横穿文字」剔除这种成对的窄线（日志 `表格框线：剔除 N 条横穿文字的装饰横线`），`H310U10004.pdf` 表題欄的 `枠 建て付け注意ラベル貼付要領図` 就是这一例；若仍错行，可用 `--debug` 看该表 `tables_text.txt` 的「单元格明细」，把横线 y 坐标和文字高度对一下，必要时把 `RuledTableMinCellMm` 调大（默认 2mm）让更宽的窄带也被当作假行。
 
 ## 项目结构
 
 | 文件 | 职责 |
 | --- | --- |
 | `Program.cs` | 入口：无参数启动 GUI，带参数走命令行 |
-| `MainForm.cs` / `MainForm.Designer.cs` | 图形界面与布局 |
+| `MainForm.cs` / `MainForm.Designer.cs` | 图形界面与布局；`LoadUiOptions()` / `SaveUiOptions()` 在启动、开始分割、关闭窗口时读写界面参数 |
 | `CommandLineRunner.cs` | 命令行参数解析与输出 |
-| `PartSplitterService.cs` | 「加载文件 → 检测分割 → 落盘」流程封装，GUI 与 CLI 共用（PDF 先推断表格块，再检测；写 `parts_info.json` / `parts_text.txt` / `callouts.txt` / `outside_info.json` / `outside_text.txt`） |
+| `BatchRunner.cs` | 批量：列文件夹里的 PDF、逐张调用 `PartSplitterService.Run`、单张失败隔离、汇总日志（GUI 与命令行共用） |
+| `SplitApi.cs` | 对外接口：`Split(文件路径)` / `Split(文件路径, 输出目录)` / `Split(文件路径, DetectorOptions)` / `SplitAsync(...)`，失败也以结果对象返回，不抛异常 |
+| `SplitResult.cs` | 接口返回模型：成功标志、退出码、零件列表、输出目录、日志、耗时 |
+| `PartSplitterService.cs` | 「加载文件 → 检测分割 → 落盘」流程封装，GUI 与 CLI 共用（输出目录留空时落到 `<输入文件目录>\AiAppData\<图纸名>` 并自动创建；PDF 先推断表格块，再检测；写 `parts_info.json` / `parts_text.txt` / `callouts.txt` / `outside_info.json` / `outside_text.txt` / `tables_info.json` / `tables_text.txt` / `tables\*.csv`；PDF 表格落盘后再展开「下表参照」写 `LT_STEP1.csv`、摊平品種表写 `LT_STEP2.csv`；`Run(..., out List<RuledTable>)` 把表格一并返回给接口层） |
 | `PdfRenderer.cs` | PDF → OpenCV Mat（Docnet.Core / PDFium） |
 | `PartDetector.cs` | 核心图像处理与零件裁切：二值化、图框擦除、表格遮蔽（块 / 列 / 固定比例）、形态学、轮廓筛选、合并、文字行占比筛除（`DropTextHeavyRects`）（`MaskStartX` 对外暴露表格区起点） |
 | `PartTextExtractor.cs` | 读 PDF 文字层：`DetectTableAreas` 推断表格 / 表題欄矩形；框内按重叠率归属各零件图 → 分行（`GroupIntoLines`）→ 逐词（`BuildWordLines`，默认）/ 按行（`BuildLines`）整理清单；框外分「表格区 / 其它」并重组成表→行→单元格；`ReadTextLineBoxes` 提供整页文字行框供占比筛除 |
 | `PartText.cs` | 词级文字坐标模型、清单行模型（`PartTextLine`）、表格行列模型、页面矩形 `PageRect`、页面文字结果模型 |
 | `Callout.cs` | 圈号标注模型（圈内数字 + 圆心 / 半径 + 绝对 / 局部 / mm 坐标 + ① 显示形式） |
+| `RuledTable.cs` | 有线表格模型：单元格（行列号 / 跨度 / 文字 / 像素与 mm 坐标）、行、`RuledTable`（坐标 / 行列数 / `ToGrid()` 二维文字表） |
+| `RuledTableExtractor.cs` | 有线表格识别：PDF 矢量路径取横 / 竖框线（描边线 + 细长填充矩形、贝塞尔扁平化、共线合并）→ 剔除横穿文字的装饰横线（`DropTextCrossingPairs`）→ 最小闭合矩形枚举单元格 → 并查集按共用边界成表 → 文字按格心落格（最小格优先） |
+| `RuledTableWriter.cs` | 有线表格落盘：`tables_info.json`（无 BOM）/ `tables_text.txt`（框线二维表 + 明细，CJK 宽度对齐）/ `tables\table_NN.csv`（RFC 4180，均带 BOM） |
+| `LtStep1Builder.cs` | 表格 CSV 后处理：遍历 `tables\*.csv` → 认表头（番号 / 部品名 / 部品コード）的部品表 → 「部品コード = 下表参照」的行按下一张参照表的明细条数展开（只换部品コード，其余列沿用） → 写 `LT_STEP1.csv`（RFC 4180、带 BOM） |
+| `LtStep2Builder.cs` | 表格 CSV 后处理：认「表头含 `品種` 且同一列名重复 ≥ 2 次」的品種表 → 重复列名的每次出现 = 一组部品ブロック（块标题 `部品名 ： …` 作部品名） → 摊平成 品種 / 部品名 / 部品コード / 員数 → 写 `LT_STEP2.csv`（多张表按文件名顺序追加，RFC 4180、带 BOM） |
+| `CsvFile.cs` | CSV 公共读写：`Escape`（RFC 4180 转义，**先把字段内换行压成 `~`**）/ `SingleLine`（换行 → `~`，连续换行只留一个）/ `Normalize`（表头归一化，去空格与换行）/ `IsEmptyRow` / `IndexOfHeader` / `Read` / `Write`；`tables\*.csv`、`LT_STEP1.csv`、`LT_STEP2.csv` 共用同一份规则 |
 | `CalloutExtractor.cs` | 圈号识别：矢量路径找整圆（扁平化后判定圆度 / 方位覆盖）、与文字层数字配对、按零件图归属；`MarkCalloutWords` 按坐标把圈号回填到词上（供 `parts_text.txt` 替换） |
-| `DetectorOptions.cs` | 全部可调参数 + 日志回调 |
+| `DetectorOptions.cs` | 全部可调参数 + 日志回调；`GetDefaultOutputDirectory` 约定「结果放在所选图纸旁边的 `AiAppData\<图纸名>`」（第 2 页起补 `_P页号`） |
+| `GuiSettings.cs` | 界面参数持久化：`%APPDATA%\CadPartSplitter\settings.ini`（读写容错、范围钳制、`ApplyTo` / `FromOptions` 与 `DetectorOptions` 互转） |
 | `docs/分割原理.md` | 分割原理技术说明（流水线、算法依据、调参、案例复盘、文字坐标换算） |
 
 ## 构建
@@ -419,6 +788,48 @@ powershell -ExecutionPolicy Bypass -File _test\gen_test_raster.ps1
 bin\Debug\CadPartSplitter.exe _test\test_raster.png _test\out --area 20000 --kw 40 --kh 10 --pad 10
 ```
 
+`_test/gui_shot.ps1` 启动图形界面 → 截取当前屏幕 → 关闭进程（用于核对界面布局改动，
+不产生输出、不写任何业务文件）：
+
+```
+powershell -ExecutionPolicy Bypass -File _test\gui_shot.ps1        # 截图存为 _test\gui_shot.png
+```
+
+`_test/api_probe.ps1` 用反射加载 `bin\Debug\CadPartSplitter.exe`（不需要另建宿主工程），
+逐项核对对外接口与参数持久化：`SplitApi.Split(路径)` 的返回值 / 输出目录（应为
+`_test\verify_api\AiAppData\H310A20009`）/ 零件数、文件不存在与空路径的退出码、
+`GuiSettings` 存取往返、手改坏值的钳制、`ApplyTo` / `FromOptions` 与 `DetectorOptions` 的互转：
+
+```
+powershell -ExecutionPolicy Bypass -File _test\api_probe.ps1       # 结果写到 _test\verify_api\AiAppData\H310A20009\
+```
+
+`_test/gui_output_probe.ps1` 专门核对界面的「输出目录自动推导」（不弹窗：反射构造 `MainForm`
+后调用私有 `SetInputFile`，再读回 `txtOutput` 内容）：选文件后应为
+`<图纸目录>\AiAppData\<图纸名>`、页码 > 0 时补 `_P2`、手工改过输出目录则不被覆盖：
+
+```
+powershell -ExecutionPolicy Bypass -File _test\gui_output_probe.ps1
+```
+
+`_test/gui_batch_probe.ps1` 核对界面的「批量模式」（同样不弹窗，反射构造 `MainForm` 后调用私有
+`SetInputFolder` / `SetInputFile` / `LogBatchHeader` / `NormalizePath` / `PastePathInto`）：选文件夹后输出目录应为
+`<文件夹>\AiAppData`、开始按钮文字变「开始批量处理」、页码上限放开到 9999；手工改过输出目录不被覆盖；换回单文件后按钮
+文字复原为「开始分割」且输出目录回到 `<图纸目录>\AiAppData\<图纸名>`；用**含日文的真实路径**跑一遍批量表头日志
+—— 日志里的 `<图纸名>` 只是说明文字，绝不能喂给 `Path.Combine`
+（`<` `>` 是 Windows 非法路径字符，会抛 `ArgumentException：パスに無効な文字が含まれています。`，
+界面直接崩，这个探针就是防它复现的）；最后核对「粘贴路径」：`"D:\…"` 去引号、`file:///D:/…` 转本地、
+多行只取第一行，并把带引号 + 换行的文本放进剪贴板真跑一遍 `PastePathInto`，确认输入框被清理成干净的文件夹路径、
+按钮变「开始批量处理」、日志里有「已粘贴文件夹」提示；粘单个 PDF 时页码上限也会像「浏览…」一样收窄到总页数以内：
+
+```
+powershell -ExecutionPolicy Bypass -File _test\gui_batch_probe.ps1
+powershell -ExecutionPolicy Bypass -File _test\gui_batch_probe.ps1 -AssemblyPath <其它编译产物.exe>
+```
+
+> 主工程暂时装不上 NuGet 时（`bin\Debug` 里的 exe 是旧的），可以先用 `-AssemblyPath` 指向
+> 用同一份源码编译出来的临时宿主 exe 来跑这个探针。
+
 `_test/callout_overlay.ps1` 用来核对圈号识别结果：读输出目录里的 `parts_info.json`，
 把每条 `callouts` 的圆画成红圈 + 蓝色 ① 标签叠在对应的 `Part_NN.png` 上
 （生成 `Part_NN_callouts.png`），一眼就能看出圈和数字是否配对正确：
@@ -440,6 +851,44 @@ powershell -ExecutionPolicy Bypass -File _test\verify_callout_text.ps1 _test\ver
 用来查看某份 PDF 里「圈」的矢量路径是怎么画的（`dotnet run -- <pdf> <页> <宽> <高> circles`），
 换用新图纸时若圈号识别不准，可先用它确认圈是「四段贝塞尔」还是「折线」、半径落在什么区间。
 若本机 SDK 不是 10，请把 `PathProbe.csproj` 的 `TargetFramework` 改成本机版本。
+
+`_test/TableProbe/` 用来单独验证「有线表格识别」（同样不参与主工程构建，直接链接主工程的
+`RuledTable*.cs` / `DetectorOptions.cs` 源文件，跑的就是正式代码；需 .NET SDK 8+，
+若本机 SDK 不是 10，请把 `TableProbe.csproj` 的 `TargetFramework` 改成本机版本）：
+
+```
+dotnet run --project _test\\TableProbe -- H310U10004.pdf            # 默认第 1 页、300 DPI
+dotnet run --project _test\\TableProbe -- H310U10004.pdf 0 300 _test\\verify_tables
+```
+
+输出：控制台打印页尺寸、表格数量，以及每张表逐行逐格的文字；`_test\\verify_tables\\`（或你给的
+目录）里同时生成 `tables_info.json` / `tables_text.txt` / `tables\\table_NN.csv`。
+退出码 `0` 识别到表格、`2` 未识别到、`1` 参数 / 读取错误 —— 换新图纸时先跑它，
+能立刻看出是「框线没取到」还是「文字没落进格」。
+
+`_test/CsvProbe/` 校验 CSV 的「一格一行」规则（换行压成 `~`）：不读 PDF，直接把
+`CsvFile.SingleLine` / `Escape` / `Write`+`Read` 以及 `RuledTableWriter.Save` 跑一遍，
+断言「物理行数 = 记录数」「读回列数不变」「二维表不被换行撑歪」。不需要参数：
+
+```
+dotnet run --project _test\\CsvProbe
+```
+
+输出逐条 `[ok]` / `[NG]`，退出码 `0` 全部通过、`1` 有断言失败；产物落在
+`_test\\CsvProbe\\bin\\Debug\\<tfm>\\out\\`（每次运行前清空）。
+
+`_test/LineProbe/` 是框线诊断探针（同样是链接主工程源文件、不参与主工程构建）：把某个像素窗口里
+**有哪些矢量路径、哪些横线 / 竖线**原样打出来（含 filled / stroked、线宽、每条线段的像素区间），
+用来查「表格多一行 / 少一行、文字跑到别的行」这类几何问题 —— 先看清 PDF 里那几条线到底是描边线、
+填充细矩形还是一整块填充面，再决定要不要改算法：
+
+```
+dotnet run --project _test\\LineProbe -- H310U10004.pdf 1 300 7600 5560 9200 5600
+```
+
+参数：`<pdf> [页码(1起)] [DPI] [x1 y1 x2 y2（像素窗口）] [minSpanPx（只打印包围盒长边≥该值的路径，默认 60）]`。
+像素窗口内的横线 / 竖线按 `RuledTableExtractor` 的同一套判据（`|dy|≤0.6mm` + 长 ≥ 2mm）筛出。
+
 
 表格残片筛除（文字行占比 ≥ 60%）可直接用命令行核对：`H310U10004.pdf` 默认应输出 11 张
 （日志 2 条 `[DROP]` + `[INFO] 文字行占比筛除：丢弃 2 个 / 保留 11 个`），

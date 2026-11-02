@@ -41,13 +41,36 @@ namespace CadPartSplitter
             }
         }
 
+        /// <summary>
+        /// 执行「加载 → 检测分割 → 落盘」全流程。
+        /// 输出目录留空时写到 <c>&lt;输入文件所在目录&gt;\AiAppData\&lt;主文件名&gt;</c>
+        /// （多页 PDF 第 2 页起为 <c>&lt;主文件名&gt;_P页号</c>）。
+        /// </summary>
         public static List<PartInfo> Run(string filePath, DetectorOptions opts)
+        {
+            List<RuledTable> ignoredTables;
+            return Run(filePath, opts, out ignoredTables);
+        }
+
+        /// <summary>
+        /// 同上，并把识别到的「有线表格」一并返回（PDF 输入才有，位图为空列表）。
+        /// 表格同时也会落盘为 <c>tables_info.json</c> / <c>tables_text.txt</c> / <c>tables\table_NN.csv</c>。
+        /// </summary>
+        public static List<PartInfo> Run(string filePath, DetectorOptions opts, out List<RuledTable> tables)
         {
             if (opts == null)
                 throw new ArgumentNullException("opts");
 
             if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
                 throw new FileNotFoundException("Input file not found.", filePath);
+
+            tables = new List<RuledTable>();
+
+            // 未指定输出目录 → 与下游约定一致：<所选图纸所在目录>\AiAppData\<主文件名>
+            if (string.IsNullOrWhiteSpace(opts.OutputDirectory))
+                opts.OutputDirectory = DetectorOptions.GetDefaultOutputDirectory(filePath, opts.PdfPageIndex);
+
+            Directory.CreateDirectory(opts.OutputDirectory);
 
             opts.Log("[INFO] Input: " + Path.GetFullPath(filePath));
             opts.Log("[INFO] Output: " + Path.GetFullPath(opts.OutputDirectory));
@@ -132,6 +155,28 @@ namespace CadPartSplitter
                         opts.Log("[INFO] Callout report saved: " + calloutPath);
                     }
                 }
+            }
+
+            // 有线表格（单元格四面都被框线围住）—— 只读，与零件分割互不影响：
+            // 哪怕这张图纸一个零件都没框出来，表格内容也照样落盘。
+            // 开关、容差、日志都在 RuledTableExtractor / DetectorOptions 里，这里只负责「PDF 就试一次」。
+            if (string.Equals(Path.GetExtension(filePath), ".pdf", StringComparison.OrdinalIgnoreCase))
+            {
+                tables = RuledTableExtractor.Extract(
+                    filePath, opts.PdfPageIndex, imgWidth, imgHeight, opts);
+
+                if (tables.Count > 0)
+                {
+                    RuledTableWriter.Save(tables, opts.OutputDirectory, filePath, opts);
+
+                    // 部品表「下表参照」展开 → LT_STEP1.csv（下游 AI 环节按这个文件名取）
+                    LtStep1Builder.Build(opts.OutputDirectory, opts);
+
+                    // 「品種 + 多列重复」表摊平 → LT_STEP2.csv
+                    LtStep2Builder.Build(opts.OutputDirectory, opts);
+                }
+                else
+                    opts.Log("[INFO] 表格内容：该页没有识别到有线表格，不生成 tables_* 文件。");
             }
 
             return parts;

@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <NoWarn>CS0168;CS0219</NoWarn>
+    <AssemblyName>TableProbe</AssemblyName>
+    <!-- 与主工程一致，保证链接进来的源文件不会用到 C# 7.3 以后的语法 -->
+    <LangVersion>7.3</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="PdfPig" Version="0.1.9" />
+  </ItemGroup>
+
+  <!--
+    探针直接链接主工程的源文件（而不是复制一份逻辑），
+    保证「探针看到的算法」与「CadPartSplitter.exe 实际运行的算法」是同一份代码。
+    CadPartSplitter 主工程是 .NET Framework 4.8 / C# 7.3，这里的源文件同样保持 C# 7.3 语法。
+  -->
+  <ItemGroup>
+    <Compile Include="..\..\RuledTable.cs" Link="Linked\RuledTable.cs" />
+    <Compile Include="..\..\RuledTableExtractor.cs" Link="Linked\RuledTableExtractor.cs" />
+    <Compile Include="..\..\RuledTableWriter.cs" Link="Linked\RuledTableWriter.cs" />
+    <Compile Include="..\..\CsvFile.cs" Link="Linked\CsvFile.cs" />
+    <Compile Include="..\..\DetectorOptions.cs" Link="Linked\DetectorOptions.cs" />
+  </ItemGroup>
+
+</Project>

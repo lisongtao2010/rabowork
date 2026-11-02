@@ -8,8 +8,11 @@ namespace MSIFAITOOLS.Services
     /// <summary>单个 PDF 的 AI 分析 + 登录结果状态。</summary>
     internal enum PartAnalysisFileStatus
     {
-        /// <summary>没有 *_plu_table.txt（尚未执行分解）。</summary>
+        /// <summary>没有 plu_table.txt（尚未执行分解）。</summary>
         MissingTableFile,
+
+        /// <summary>【CMD 分析】没有 LT_STEP1.csv（CadPartSplitter 未生成）。</summary>
+        MissingLtStep1File,
 
         /// <summary>AI 没有提取到部品明细（无符合表头或番号不连续等）。</summary>
         NoPartData,
@@ -96,8 +99,8 @@ namespace MSIFAITOOLS.Services
 
     /// <summary>
     /// AI 分析编排服务：遍历一览中分类为「アッセンブリ図」的 PDF，
-    /// 用 AI 解析其 *_plu_table.txt 取得【部品基本信息列表】，
-    /// 用 *_xy.txt 的文字坐标校验，最后登录到 SQLite 的部品基本信息表。
+    /// 用 AI 解析其 plu_table.txt 取得【部品基本信息列表】，
+    /// 用 xy.txt 的文字坐标校验，最后登录到 SQLite 的部品基本信息表。
     /// </summary>
     internal sealed class PartAnalysisService
     {
@@ -136,13 +139,13 @@ namespace MSIFAITOOLS.Services
 
         /// <summary>
         /// 分析一览中「アッセンブリ図」的 PDF 并登录到 SQLite，返回汇总结果。
+        /// 每个 PDF 的分解结果位于 &lt;输出根目录&gt;\&lt;図番号&gt;\（plu_table.txt / xy.txt）。
         /// </summary>
         /// <param name="classifications">一览（分类结果）数据。</param>
-        /// <param name="xyDirectory">&lt;PDF 文件夹&gt;\AppData\xy（坐标文件目录）。</param>
-        /// <param name="pluDirectory">&lt;PDF 文件夹&gt;\AppData\plu（表格文件目录）。</param>
+        /// <param name="outputDirectory">分解输出根目录（&lt;PDF 文件夹&gt;\AiAppData）。</param>
         /// <param name="onLog">日志回调（kind, message）。</param>
         public PartAnalysisSummary AnalyzeAndSave(IList<PdfClassification> classifications,
-            string xyDirectory, string pluDirectory, Action<LogKind, string> onLog)
+            string outputDirectory, Action<LogKind, string> onLog)
         {
             if (!_options.IsConfigured)
             {
@@ -151,10 +154,10 @@ namespace MSIFAITOOLS.Services
                     "（也可使用 App.config 的 AiApiKey 或环境变量 MSIF_AI_API_KEY）。");
             }
 
-            if (string.IsNullOrWhiteSpace(pluDirectory) || !Directory.Exists(pluDirectory))
+            if (string.IsNullOrWhiteSpace(outputDirectory) || !Directory.Exists(outputDirectory))
             {
                 throw new DirectoryNotFoundException(
-                    "找不到表格输出目录（请先执行【开始分解】）：" + pluDirectory);
+                    "找不到分解输出目录（请先执行【开始分解】）：" + outputDirectory);
             }
 
             PartAnalysisSummary summary = new PartAnalysisSummary(_databasePath);
@@ -208,7 +211,7 @@ namespace MSIFAITOOLS.Services
 
                 for (int index = 0; index < targets.Count; index++)
                 {
-                    AnalyzeOne(targets[index], index + 1, targets.Count, xyDirectory, pluDirectory,
+                    AnalyzeOne(targets[index], index + 1, targets.Count, outputDirectory,
                         analyzer, repository, summary, onLog);
                 }
             }
@@ -217,30 +220,35 @@ namespace MSIFAITOOLS.Services
         }
 
         /// <summary>处理单个 PDF（异常在此捕获，保证批量分析不中断）。</summary>
-        private void AnalyzeOne(PdfClassification item, int index, int total, string xyDirectory,
-            string pluDirectory, AiPartAnalyzer analyzer, PartBasicInfoRepository repository,
+        private void AnalyzeOne(PdfClassification item, int index, int total, string outputDirectory,
+            AiPartAnalyzer analyzer, PartBasicInfoRepository repository,
             PartAnalysisSummary summary, Action<LogKind, string> onLog)
         {
             string stem = Path.GetFileNameWithoutExtension(item.FilePath);
 
             ReportLog(onLog, LogKind.Info, string.Format("[{0}/{1}] AI 分析：{2}", index, total, item.FileName));
 
-            string tablePath = Path.Combine(pluDirectory, stem + PdfSplitService.PluTableFileSuffix);
+            // 该 PDF 的分解结果都在 <输出根目录>\<図番号>\ 下（文件名不含 PDF 名）
+            string pdfOutputDirectory = string.IsNullOrWhiteSpace(outputDirectory)
+                ? null
+                : PdfSplitService.GetPdfOutputDirectory(outputDirectory, stem);
 
-            if (!File.Exists(tablePath))
+            string tablePath = pdfOutputDirectory == null
+                ? null
+                : Path.Combine(pdfOutputDirectory, PdfSplitService.PluTableFileName);
+
+            if (string.IsNullOrEmpty(tablePath) || !File.Exists(tablePath))
             {
                 summary.MissingTableFileCount++;
                 summary.Files.Add(new PartAnalysisFileResult(item.FilePath, stem,
                     PartAnalysisFileStatus.MissingTableFile, 0, 0, "缺少表格文件：" + tablePath));
                 ReportLog(onLog, LogKind.Warning,
-                    "  跳过：找不到 " + Path.GetFileName(tablePath) + "（请先执行【开始分解】）");
+                    "  跳过：找不到 " + PdfSplitService.PluTableFileName + "（请先执行【开始分解】）");
 
                 return;
             }
 
-            string xyPath = string.IsNullOrWhiteSpace(xyDirectory)
-                ? null
-                : Path.Combine(xyDirectory, stem + PdfSplitService.XyFileSuffix);
+            string xyPath = Path.Combine(pdfOutputDirectory, PdfSplitService.XyFileName);
 
             try
             {
@@ -285,7 +293,7 @@ namespace MSIFAITOOLS.Services
         }
 
         /// <summary>从一览中挑出「アッセンブリ図」（含用户手动改判的）。</summary>
-        private static List<PdfClassification> SelectAssemblyTargets(IList<PdfClassification> classifications)
+        public static List<PdfClassification> SelectAssemblyTargets(IList<PdfClassification> classifications)
         {
             List<PdfClassification> targets = new List<PdfClassification>();
 
@@ -349,7 +357,7 @@ namespace MSIFAITOOLS.Services
         }
 
         /// <summary>统计指定校验状态的条数。</summary>
-        private static int CountStatus(IList<PartBasicInfo> parts, string status)
+        public static int CountStatus(IList<PartBasicInfo> parts, string status)
         {
             int count = 0;
 
@@ -365,7 +373,7 @@ namespace MSIFAITOOLS.Services
         }
 
         /// <summary>把前几条明细打印到日志，便于确认提取结果。</summary>
-        private static void LogSampleRows(Action<LogKind, string> onLog, IList<PartBasicInfo> parts)
+        public static void LogSampleRows(Action<LogKind, string> onLog, IList<PartBasicInfo> parts)
         {
             const int MaxSampleCount = 3;
 
@@ -384,7 +392,7 @@ namespace MSIFAITOOLS.Services
             }
         }
 
-        private static void ReportLog(Action<LogKind, string> onLog, LogKind kind, string message)
+        public static void ReportLog(Action<LogKind, string> onLog, LogKind kind, string message)
         {
             if (onLog != null)
             {
