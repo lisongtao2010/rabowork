@@ -6,7 +6,7 @@ using System.Text;
 
 namespace MSIFAITOOLS.Services
 {
-    /// <summary>一个 LT_STEP1.csv 及其对应的页码（&lt;図番&gt;\ = 第 1 页，&lt;図番&gt;_P2\ = 第 2 页 …）。</summary>
+    /// <summary>一个 01_アッセンブリ図_部品機能情報.csv 及其对应的页码（&lt;図番&gt;\ = 第 1 页，&lt;図番&gt;_P2\ = 第 2 页 …）。</summary>
     internal sealed class CmdPartSource
     {
         public CmdPartSource(string filePath, int page)
@@ -15,7 +15,7 @@ namespace MSIFAITOOLS.Services
             Page = page < 1 ? 1 : page;
         }
 
-        /// <summary>LT_STEP1.csv 的完整路径。</summary>
+        /// <summary>01_アッセンブリ図_部品機能情報.csv 的完整路径。</summary>
         public string FilePath { get; private set; }
 
         /// <summary>该 CSV 所在的页码（第 1 页 = 1）。</summary>
@@ -43,25 +43,33 @@ namespace MSIFAITOOLS.Services
         /// <summary>分析过程中的提示（读取条数、去重、坐标校验统计等）。</summary>
         public IList<string> Notes { get; private set; }
 
-        /// <summary>本次读取的 LT_STEP1.csv 清单。</summary>
+        /// <summary>本次读取的 01_アッセンブリ図_部品機能情報.csv 清单。</summary>
         public IList<CmdPartSource> Sources { get; private set; }
     }
 
     /// <summary>
     /// 【CMD 分析】的核心：<b>不调用 AI</b>，用本工具自己的逻辑把 CadPartSplitter 生成的
-    /// <c>LT_STEP1.csv</c> 解析成【部品基本信息列表】，再用 <c>xy.txt</c> 的文字坐标交叉校验。
+    /// <c>01_アッセンブリ図_部品機能情報.csv</c>（旧名 <c>LT_STEP1.csv</c>）解析成
+    /// 【部品基本信息列表】，再用 <c>xy.txt</c> 的文字坐标交叉校验。
     ///
     /// 为什么可以直接读 CSV：
-    ///   · <c>LT_STEP1.csv</c> 就是部品表本体（CadPartSplitter 已把「下表参照」按参照表展开，
-    ///     同一番号会变成多条不同部品コード的明细），字段与数据库表一一对应；
+    ///   · <c>01_アッセンブリ図_部品機能情報.csv</c> 就是部品表本体（CadPartSplitter 已把
+    ///     「下表参照」按参照表展开，同一番号会变成多条不同部品コード的明细），字段与数据库表一一对应；
     ///   · 表头沿用图纸原表头（列顺序 / 列数不固定，还可能带换行与单位），
     ///     因此这里一律<b>按列名</b>映射，而不是按列号取；
     ///   · 文件编码与 CadPartSplitter 一致：带 BOM 的 UTF-8 + RFC 4180 转义。
     /// </summary>
     internal sealed class CmdPartAnalyzer
     {
-        /// <summary>CadPartSplitter 为下游约定的部品表文件名。</summary>
-        public const string LtStep1FileName = "LT_STEP1.csv";
+        /// <summary>
+        /// CadPartSplitter 为下游约定的部品表文件名（アッセンブリ図 的「部品機能情報」）。
+        /// </summary>
+        public const string LtStep1FileName = "01_アッセンブリ図_部品機能情報.csv";
+
+        /// <summary>
+        /// 改名前的旧文件名：老分解结果里可能还留着它，按新名字取不到时兜底用。
+        /// </summary>
+        public const string LegacyLtStep1FileName = "LT_STEP1.csv";
 
         /// <summary>「番号」列候选名（先完全一致匹配，再退到「包含」匹配）。</summary>
         private static readonly string[] NumberHeaders = { "番号" };
@@ -88,9 +96,10 @@ namespace MSIFAITOOLS.Services
         private static readonly string[] CutSizeHeaders = { "切断寸法", "カット寸法" };
 
         /// <summary>
-        /// 在分解输出根目录下找出该 PDF 对应的全部 <c>LT_STEP1.csv</c>：
-        /// <c>&lt;输出根目录&gt;\&lt;図番&gt;\LT_STEP1.csv</c>（第 1 页），
-        /// <c>&lt;输出根目录&gt;\&lt;図番&gt;_P2\LT_STEP1.csv</c>（第 2 页）…按页码升序。
+        /// 在分解输出根目录下找出该 PDF 对应的全部 <c>01_アッセンブリ図_部品機能情報.csv</c>：
+        /// <c>&lt;输出根目录&gt;\&lt;図番&gt;\01_アッセンブリ図_部品機能情報.csv</c>（第 1 页），
+        /// <c>&lt;输出根目录&gt;\&lt;図番&gt;_P2\01_アッセンブリ図_部品機能情報.csv</c>（第 2 页）…按页码升序。
+        /// 目录里只有改名前的 <c>LT_STEP1.csv</c> 时也能读到（见 <see cref="LegacyLtStep1FileName"/>）。
         /// </summary>
         /// <param name="outputDirectory">分解输出根目录（&lt;PDF 文件夹&gt;\AiAppData）。</param>
         /// <param name="stem">図番（PDF 文件名去扩展名）。</param>
@@ -106,10 +115,10 @@ namespace MSIFAITOOLS.Services
 
             string drawingNo = stem.Trim();
 
-            // 第 1 页：<根目录>\<図番>\LT_STEP1.csv
+            // 第 1 页：<根目录>\<図番>\01_アッセンブリ図_部品機能情報.csv
             AddSource(sources, Path.Combine(outputDirectory, drawingNo), 1);
 
-            // 第 2 页起：<根目录>\<図番>_P2\LT_STEP1.csv（CadPartSplitter 逐页分割时的命名规则）
+            // 第 2 页起：<根目录>\<図番>_P2\01_アッセンブリ図_部品機能情報.csv（CadPartSplitter 逐页分割时的命名规则）
             string[] folders;
 
             try
@@ -155,7 +164,7 @@ namespace MSIFAITOOLS.Services
         /// 解析一份 PDF 的全部 <paramref name="sources"/>，返回部品基本信息列表（含坐标校验结果）。
         /// </summary>
         /// <param name="pdfFilePath">PDF 完整路径（取図番、写入来源）。</param>
-        /// <param name="sources">该 PDF 的 LT_STEP1.csv 清单（见 <see cref="LocateSources"/>）。</param>
+        /// <param name="sources">该 PDF 的 01_アッセンブリ図_部品機能情報.csv 清单（见 <see cref="LocateSources"/>）。</param>
         /// <param name="xyFilePath">xy.txt 的完整路径；不存在时跳过坐标校验。</param>
         public CmdPartAnalysisResult Analyze(string pdfFilePath, IList<CmdPartSource> sources, string xyFilePath)
         {
@@ -312,7 +321,7 @@ namespace MSIFAITOOLS.Services
                 new List<string>(notes).AsReadOnly(), new List<CmdPartSource>(sources).AsReadOnly());
         }
 
-        /// <summary>把 <paramref name="folder"/> 下的 LT_STEP1.csv 加入清单（存在才加）。</summary>
+        /// <summary>把 <paramref name="folder"/> 下的 01_アッセンブリ図_部品機能情報.csv 加入清单（存在才加）。</summary>
         private static void AddSource(List<CmdPartSource> sources, string folder, int page)
         {
             if (!Directory.Exists(folder))
@@ -321,6 +330,12 @@ namespace MSIFAITOOLS.Services
             }
 
             string csvPath = Path.Combine(folder, LtStep1FileName);
+
+            if (!File.Exists(csvPath))
+            {
+                // 兼容改名前的分解结果：目录里只有 LT_STEP1.csv 时照样读
+                csvPath = Path.Combine(folder, LegacyLtStep1FileName);
+            }
 
             if (File.Exists(csvPath))
             {

@@ -52,6 +52,7 @@ namespace CadPartSplitter
             this.panelActions = new System.Windows.Forms.Panel();
             this.btnStart = new System.Windows.Forms.Button();
             this.btnOpenOutput = new System.Windows.Forms.Button();
+            this.btnPdfInfo = new System.Windows.Forms.Button();
             this.progressBar = new System.Windows.Forms.ProgressBar();
             this.lblStatus = new System.Windows.Forms.Label();
             this.grpLog = new System.Windows.Forms.GroupBox();
@@ -381,6 +382,7 @@ namespace CadPartSplitter
             // 
             this.panelActions.Controls.Add(this.btnStart);
             this.panelActions.Controls.Add(this.btnOpenOutput);
+            this.panelActions.Controls.Add(this.btnPdfInfo);
             this.panelActions.Controls.Add(this.progressBar);
             this.panelActions.Controls.Add(this.lblStatus);
             this.panelActions.Dock = System.Windows.Forms.DockStyle.Fill;
@@ -407,15 +409,24 @@ namespace CadPartSplitter
             this.btnOpenOutput.TabIndex = 1;
             this.btnOpenOutput.Text = "打开输出目录";
             this.btnOpenOutput.UseVisualStyleBackColor = true;
+            //
+            // btnPdfInfo
+            //
+            this.btnPdfInfo.Location = new System.Drawing.Point(320, 6);
+            this.btnPdfInfo.Name = "btnPdfInfo";
+            this.btnPdfInfo.Size = new System.Drawing.Size(150, 34);
+            this.btnPdfInfo.TabIndex = 4;
+            this.btnPdfInfo.Text = "图面分类清单…";
+            this.btnPdfInfo.UseVisualStyleBackColor = true;
             // 
             // progressBar
             // 
             this.progressBar.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left)
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.progressBar.Location = new System.Drawing.Point(330, 14);
+            this.progressBar.Location = new System.Drawing.Point(480, 14);
             this.progressBar.MarqueeAnimationSpeed = 25;
             this.progressBar.Name = "progressBar";
-            this.progressBar.Size = new System.Drawing.Size(400, 18);
+            this.progressBar.Size = new System.Drawing.Size(250, 18);
             this.progressBar.Style = System.Windows.Forms.ProgressBarStyle.Marquee;
             this.progressBar.TabIndex = 2;
             this.progressBar.Visible = false;
@@ -521,6 +532,7 @@ namespace CadPartSplitter
         private System.Windows.Forms.Panel panelActions;
         private System.Windows.Forms.Button btnStart;
         private System.Windows.Forms.Button btnOpenOutput;
+        private System.Windows.Forms.Button btnPdfInfo;
         private System.Windows.Forms.ProgressBar progressBar;
         private System.Windows.Forms.Label lblStatus;
         private System.Windows.Forms.GroupBox grpLog;

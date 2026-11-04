@@ -8,8 +8,8 @@ namespace CadPartSplitter
     /// <summary>
     /// 项目内共用的 CSV 工具（RFC 4180）：读、写、字段转义，外加表头 / 空行的归一化判定。
     ///
-    /// <c>tables\table_NN.csv</c>、<c>LT_STEP1.csv</c>、<c>LT_STEP2.csv</c> 都由这里读写，
-    /// 编码风格统一：写出一律是「带 BOM 的 UTF-8 + CRLF」（Excel 双击打开日文 / 中文不乱码），
+    /// <c>tables\table_NN.csv</c>、<c>01_アッセンブリ図_部品機能情報.csv</c>、<c>02_要領図_部品機能情報.csv</c>
+    /// 都由这里读写，编码风格统一：写出一律是「带 BOM 的 UTF-8 + CRLF」（Excel 双击打开日文 / 中文不乱码），
     /// 读入时 BOM 自动丢弃、CRLF / LF 都收、引号内的逗号照原样保留。
     ///
     /// **一格一行**：写出一律先把字段内的换行压成 <see cref="LineBreakPlaceholder"/>（`~`）——

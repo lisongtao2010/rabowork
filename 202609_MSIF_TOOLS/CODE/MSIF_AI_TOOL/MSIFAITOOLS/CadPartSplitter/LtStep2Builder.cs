@@ -6,7 +6,7 @@ namespace CadPartSplitter
 {
     /// <summary>
     /// 品種表整理：读 <c>tables\table_NN.csv</c>，把「横向重复 N 组 (部品コード, 員数)」这类
-    /// 「多列重复」的表摊平成一行一个部品的 <c>LT_STEP2.csv</c>。
+    /// 「多列重复」的表摊平成一行一个部品的 <c>02_要領図_部品機能情報.csv</c>。
     ///
     /// 认得的样子（图纸上常见，表头被拆成两行 + 合并单元格）：
     /// <code>
@@ -27,14 +27,30 @@ namespace CadPartSplitter
     ///   · 表头区里存在「同一个列名出现 ≥ 2 次」的行（多列重复）→ 每次出现的列就是一组部品ブロック的起点。
     /// 只有一块、没有重复列的表不是这种表，原样跳过（不改动）。
     ///
-    /// 输出：<c>&lt;输出目录&gt;\LT_STEP2.csv</c>（UTF-8 带 BOM + CRLF + RFC 4180），
+    /// 输出：<c>&lt;输出目录&gt;\02_要領図_部品機能情報.csv</c>（旧名 <c>LT_STEP2.csv</c>；
+    /// 要領図 = 要領書，部品機能情報 = 部品表。UTF-8 带 BOM + CRLF + RFC 4180），
     /// 列固定为 品種 / 部品名 / 部品コード / 員数 —— 下游按固定列取数。
     /// 多张品種表按文件名顺序追加到同一个文件。只读 <c>tables\*.csv</c>，不改动任何已有产物。
+    ///
+    /// **只有要領図（要領書）才写这份清单**：图面分类读自分类清单 <c>classify\PdfInfoList.txt</c>
+    /// （<see cref="PdfInfoListBuilder"/> 在流水线里先跑一步生成；清单缺失 / 没有这张图时退回按
+    /// <c>tables\*.csv</c> 现判，同一套规则）。基本図 / 加工図 / アッセンブリ図 / 未识别 一律跳过，
+    /// 并删掉上一次运行可能留下的同名产物。
     /// </summary>
     public static class LtStep2Builder
     {
-        /// <summary>下游约定的文件名（写在输出目录根，与 LT_STEP1.csv 同级）。</summary>
-        public const string OutputFileName = "LT_STEP2.csv";
+        /// <summary>
+        /// 下游约定的文件名（写在输出目录根，与 01_アッセンブリ図_部品機能情報.csv 同级）。
+        /// 旧名是 <c>LT_STEP2.csv</c>，现按「图纸类别编号 + 日文名」统一成
+        /// <c>02_要領図_部品機能情報.csv</c>（要領図 = 要領書，部品機能情報 = 部品表）。
+        /// </summary>
+        public const string OutputFileName = "02_要領図_部品機能情報.csv";
+
+        /// <summary>
+        /// 改名前的老文件名：同一输出目录里若还留着上一次运行写下的它，本次顺手清掉，
+        /// 免得下游按老名字取到过期内容。
+        /// </summary>
+        private const string LegacyOutputFileName = "LT_STEP2.csv";
 
         /// <summary>品種表的标志文字（表头里出现它就认这一列是品種）。</summary>
         private const string VarietyKeyword = "品種";
@@ -58,7 +74,8 @@ namespace CadPartSplitter
         };
 
         /// <summary>
-        /// 扫描 <paramref name="outputDirectory"/> 下的 <c>tables\*.csv</c> 并写出 <c>LT_STEP2.csv</c>。
+        /// 扫描 <paramref name="outputDirectory"/> 下的 <c>tables\*.csv</c> 并写出
+        /// <c>02_要領図_部品機能情報.csv</c>（图面分类不是「要領図」时不写）。
         /// </summary>
         /// <returns>写出的明细行数（不含表头）；0 表示没有生成文件。</returns>
         public static int Build(string outputDirectory, DetectorOptions opts)
@@ -67,18 +84,37 @@ namespace CadPartSplitter
 
             if (!o.BuildLtStep2Table)
             {
-                o.Log("[INFO] LT_STEP2 整理已关闭（BuildLtStep2Table = false）。");
+                o.Log("[INFO] 02_要領図_部品機能情報 摊平已关闭（BuildLtStep2Table = false）。");
                 return 0;
             }
 
             if (string.IsNullOrWhiteSpace(outputDirectory))
                 return 0;
 
+            // 只有要領図（要領書）才需要这份清单：先读分类清单 classify\PdfInfoList.txt（流水线刚写好的
+            // 图面分类），清单缺失 / 没有这张图时退回按 tables\*.csv 现判（与清单同一套规则）。
+            // 判成别的图类就什么都不写，并清掉上一次留下的同名产物。
+            string drawingNumber = PdfInfoListBuilder.DrawingNumberFromOutputDirectory(outputDirectory);
+            string categorySource;
+            string category = PdfInfoListBuilder.ResolveCategory(outputDirectory, drawingNumber, o, out categorySource);
+
+            if (!PdfInfoListBuilder.IsRequirementCategory(category))
+            {
+                o.Log("[INFO] 02_要領図_部品機能情報：图面分类「"
+                      + (string.IsNullOrEmpty(category) ? "未识别" : category) + "」（依据：" + categorySource
+                      + "）不是要領図，跳过（并清掉旧的同名产物）。");
+
+                DeleteStaleOutput(outputDirectory, o);
+                return 0;
+            }
+
+            o.Log("[INFO] 02_要領図_部品機能情報：图面分类「要領図」（依据：" + categorySource + "），开始摊平。");
+
             string csvDir = Path.Combine(outputDirectory, "tables");
 
             if (!Directory.Exists(csvDir))
             {
-                o.Log("[INFO] LT_STEP2：没有 tables 目录（本次未生成表格 CSV），跳过。");
+                o.Log("[INFO] 02_要領図_部品機能情報：没有 tables 目录（本次未生成表格 CSV），跳过。");
                 return 0;
             }
 
@@ -114,22 +150,70 @@ namespace CadPartSplitter
                 tables++;
                 output.AddRange(detail);
 
-                o.Log("[INFO] LT_STEP2：" + Path.GetFileName(file) + " 是多列重复的品種表 → 摊平 "
+                o.Log("[INFO] 02_要領図_部品機能情報：" + Path.GetFileName(file) + " 是多列重复的品種表 → 摊平 "
                       + detail.Count + " 条明细。");
             }
 
             if (tables == 0)
             {
-                o.Log("[INFO] LT_STEP2：未找到「含品種列且列名重复」的表格，不生成 " + OutputFileName + "。");
+                o.Log("[INFO] 02_要領図_部品機能情報：未找到「含品種列且列名重复」的表格，不生成 "
+                      + OutputFileName + "。");
                 return 0;
             }
 
             string path = Path.Combine(outputDirectory, OutputFileName);
+
+            DeleteLegacyOutput(outputDirectory, o);
             CsvFile.Write(path, OutHeader, output);
 
-            o.Log("[INFO] LT_STEP2：" + tables + " 张品種表 → 共 " + output.Count + " 条明细，已保存：" + path);
+            o.Log("[INFO] 02_要領図_部品機能情報：" + tables + " 张品種表 → 共 " + output.Count + " 条明细，已保存：" + path);
 
             return output.Count;
+        }
+
+        /// <summary>
+        /// 清掉上一次运行留下的旧文件名（改名前的 <c>LT_STEP2.csv</c>）。
+        /// 删不掉（被 Excel 打开 / 无权限）只记 WARN，不影响本次输出。
+        /// </summary>
+        private static void DeleteLegacyOutput(string outputDirectory, DetectorOptions o)
+        {
+            RemoveIfExists(Path.Combine(outputDirectory, LegacyOutputFileName), "旧文件名残留 ", o);
+        }
+
+        /// <summary>
+        /// 这张图不是要領図时，把上一次运行留下的同名产物清掉
+        /// （上次可能判成要領図，留着会让下游按固定名字取到过期内容）。
+        /// </summary>
+        private static void DeleteStaleOutput(string outputDirectory, DetectorOptions o)
+        {
+            RemoveIfExists(Path.Combine(outputDirectory, OutputFileName), string.Empty, o);
+            RemoveIfExists(Path.Combine(outputDirectory, LegacyOutputFileName), "旧文件名残留 ", o);
+        }
+
+        /// <summary>
+        /// 删一个文件；不存在就什么也不做。删不掉（被 Excel 占用 / 无权限）只记 WARN。
+        /// </summary>
+        /// <param name="path">要删的文件。</param>
+        /// <param name="note">日志里的说明（例如「旧文件名残留 」），可为空。</param>
+        /// <param name="o">参数 / 日志。</param>
+        private static void RemoveIfExists(string path, string note, DetectorOptions o)
+        {
+            if (!File.Exists(path))
+                return;
+
+            try
+            {
+                File.Delete(path);
+                o.Log("[INFO] 02_要領図_部品機能情報：已删除" + note + path);
+            }
+            catch (IOException)
+            {
+                o.Log("[WARN] 02_要領図_部品機能情報：删不掉" + note + path + "（可能正被 Excel 打开）。");
+            }
+            catch (UnauthorizedAccessException)
+            {
+                o.Log("[WARN] 02_要領図_部品機能情報：删不掉" + note + path + "（无权限）。");
+            }
         }
 
         // ── 摊平 ─────────────────────────────────────────────────────────────

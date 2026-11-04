@@ -20,8 +20,6 @@ namespace MSIFAITOOLS
 
         private IList<PdfClassification> _classifications;
 
-        private bool _suppressCategoryEvent;
-
         private bool _isRunning;
 
         private string _startButtonText;
@@ -499,7 +497,8 @@ namespace MSIFAITOOLS
             string outputDir = result.OutputDirectory;
             _lastOutputDir = outputDir;
 
-            // 分类结果：分解后由 PdfSplitService 按规则自动判定，未知项在【分类结果】页由用户选择
+            // 分类结果：分解后由 PdfSplitService 读取 classify\PdfInfoList.txt，
+            // 清单里没有的 PDF 记为未知，在【分类结果】页标黄提示（需在上游工具的分类清单里补充）
             _classifyDirectory = result.ClassifyDirectory;
             PopulateClassification(result.Classifications);
 
@@ -518,7 +517,7 @@ namespace MSIFAITOOLS
                 AppendLog("输出根目录：" + outputDir, Color.FromArgb(180, 180, 180));
                 AppendLog("每个 PDF 的子目录：" + outputDir + Path.DirectorySeparatorChar + "<図番号>",
                     Color.FromArgb(180, 180, 180));
-                AppendLog("分类输出：" + _classifyDirectory, Color.FromArgb(180, 180, 180));
+                AppendLog("分类清单目录：" + _classifyDirectory, Color.FromArgb(180, 180, 180));
                 AppendLog("分类统计：" + PdfClassifier.BuildSummaryText(result.Classifications),
                     unknownCount > 0 ? Color.FromArgb(255, 200, 120) : Color.FromArgb(150, 220, 150));
 
@@ -533,10 +532,14 @@ namespace MSIFAITOOLS
                     "各 PDF 子文件夹中的文件：\n" +
                     "xy.txt / xy_imgtext.txt / table.txt /\n" +
                     "plu_text.txt / plu_layout.txt / plu_table.txt / plu_image.txt / plu_all.txt\n\n" +
-                    "分类结果（classification.csv）：\n" + _classifyDirectory + "\n\n" +
+                    "CadPartSplitter 生成的部品表（CMD 分析用）：\n" +
+                    CmdPartAnalyzer.LtStep1FileName + "（アッセンブリ図）/ " +
+                    CmdInstructionPartCollector.YoryoListFileName + "（要領図一覧）/ " +
+                    CmdInstructionPartCollector.YoryoPartFileName + "（要領図）\n\n" +
+                    "分类清单（PdfInfoList.txt）：\n" + _classifyDirectory + "\n\n" +
                     PdfClassifier.BuildSummaryText(result.Classifications) +
                     (unknownCount > 0
-                        ? "\n\n有 " + unknownCount + " 个 PDF 无法自动判定，请在【分类结果】页选择后点击「保存分类结果」。"
+                        ? "\n\n有 " + unknownCount + " 个 PDF 在分类清单里没有记录，请在上游工具的分类清单里补充。"
                         : "\n\n分类已全部确定。"),
                     "完成", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
@@ -547,7 +550,7 @@ namespace MSIFAITOOLS
 
                 if (unknownCount > 0)
                 {
-                    AppendLog("有 " + unknownCount + " 个 PDF 无法自动判定分类，请在【分类结果】页选择。",
+                    AppendLog("有 " + unknownCount + " 个 PDF 在分类清单里没有记录，请在上游工具的分类清单里补充。",
                         Color.FromArgb(255, 200, 120));
                 }
 
@@ -582,13 +585,9 @@ namespace MSIFAITOOLS
 
             lblPdfInfo.Text = "PDF：" + pdfFiles.Length + " 个";
 
-            // 优先复用 classification.csv（保留用户手工改判）；缺失或与当前 PDF 集合不一致时按规则重新判定
-            IList<PdfClassification> items = PdfClassifier.LoadSummary(folder, classifyDir);
-
-            if (!MatchesPdfFiles(items, pdfFiles))
-            {
-                items = PdfClassifier.ClassifyFiles(folder, pdfFiles, outputRoot);
-            }
+            // 分类读自 <输出根目录>\classify\PdfInfoList.txt（外部生成，本工具只读）：
+            // 清单里没有的 PDF 记为未知，在画面上标黄提示
+            IList<PdfClassification> items = PdfClassifier.LoadInfoList(folder, pdfFiles, outputRoot);
 
             PopulateClassification(items);
 
@@ -603,14 +602,17 @@ namespace MSIFAITOOLS
             AppendLog("已跳过重新分解：直接使用现有分解结果（" + pdfFiles.Length + " 个 PDF）",
                 Color.FromArgb(150, 220, 150));
             AppendLog("输出根目录：" + outputRoot, Color.FromArgb(180, 180, 180));
-            AppendLog("分类结果：" + Path.Combine(classifyDir, PdfClassifier.SummaryFileName),
+
+            string infoListPath = PdfClassifier.GetInfoListPath(outputRoot);
+
+            AppendLog("分类清单：" + infoListPath + (File.Exists(infoListPath) ? string.Empty : "（不存在）"),
                 Color.FromArgb(180, 180, 180));
             AppendLog("分类统计：" + PdfClassifier.BuildSummaryText(items),
                 unknownCount > 0 ? Color.FromArgb(255, 200, 120) : Color.FromArgb(150, 220, 150));
 
             if (unknownCount > 0)
             {
-                AppendLog("有 " + unknownCount + " 个 PDF 无法自动判定分类，请在【分类结果】页选择。",
+                AppendLog("有 " + unknownCount + " 个 PDF 在分类清单里没有记录，请在上游工具的分类清单里补充。",
                     Color.FromArgb(255, 200, 120));
             }
 
@@ -620,37 +622,6 @@ namespace MSIFAITOOLS
             lblProgress.Text = "使用现有分解结果";
             progressBar.Style = ProgressBarStyle.Continuous;
             progressBar.Value = 0;
-        }
-
-        /// <summary>
-        /// 判断已加载的分类列表是否与当前 PDF 集合一一对应（数量相同且文件名全部命中）。
-        /// 用于决定是否可以安全复用 classification.csv。
-        /// </summary>
-        /// <param name="items">从 CSV 读出的分类列表（可为 null）。</param>
-        /// <param name="pdfFiles">当前文件夹中的 PDF 文件名。</param>
-        private static bool MatchesPdfFiles(IList<PdfClassification> items, string[] pdfFiles)
-        {
-            if (items == null || items.Count == 0 || pdfFiles == null || items.Count != pdfFiles.Length)
-            {
-                return false;
-            }
-
-            HashSet<string> names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            foreach (string name in pdfFiles)
-            {
-                names.Add(name);
-            }
-
-            foreach (PdfClassification item in items)
-            {
-                if (item == null || !names.Remove(item.FileName))
-                {
-                    return false;
-                }
-            }
-
-            return names.Count == 0;
         }
 
         /// <summary>
@@ -729,7 +700,7 @@ namespace MSIFAITOOLS
             {
                 MessageBox.Show(this,
                     "【分类结果】中没有「" + PdfCategoryNames.Assembly + "」的 PDF。\n\n" +
-                    "请在【分类结果】页确认分类（未知项可在下拉框中选择）后再执行。",
+                    "请在【分类结果】页确认分类（分类由上游工具写入 PdfInfoList.txt）后再执行。",
                     "提示", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 SetStatus("没有「" + PdfCategoryNames.Assembly + "」，无需分析", Color.FromArgb(239, 108, 0));
                 return;
@@ -876,8 +847,12 @@ namespace MSIFAITOOLS
         /// <summary>
         /// 【CMD 分析】遍历【分类结果】中「アッセンブリ図」的 PDF，
         /// 用本工具自己的逻辑（<b>不调用 AI</b>）读取 CadPartSplitter 生成的
-        /// LT_STEP1.csv（&lt;输出根目录&gt;\&lt;図番号&gt;\LT_STEP1.csv），
+        /// 01_アッセンブリ図_部品機能情報.csv（&lt;输出根目录&gt;\&lt;図番号&gt;\…，旧名 LT_STEP1.csv），
         /// 以 xy.txt 校验后登录到与【AI 分析】相同的 SQLite 表。
+        ///
+        /// 追加步骤：再按 PdfInfoList.txt 的「分类依据」，顺着
+        /// 01_アッセンブリ図_要領図.csv → 各要領図的 02_要領図_部品機能情報.csv，
+        /// 把「品種命中分类依据」的部品行也登录到同一张表。
         /// 登录后可在【分类结果】选中 PDF 行 →【部品信息】查看明细。
         /// </summary>
         private async void BtnCmdAnalyze_Click(object sender, EventArgs e)
@@ -922,7 +897,7 @@ namespace MSIFAITOOLS
             {
                 MessageBox.Show(this,
                     "【分类结果】中没有「" + PdfCategoryNames.Assembly + "」的 PDF。\n\n" +
-                    "请在【分类结果】页确认分类（未知项可在下拉框中选择）后再执行。",
+                    "请在【分类结果】页确认分类（分类由上游工具写入 PdfInfoList.txt）后再执行。",
                     "提示", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 SetStatus("没有「" + PdfCategoryNames.Assembly + "」，无需分析", Color.FromArgb(239, 108, 0));
                 return;
@@ -935,8 +910,9 @@ namespace MSIFAITOOLS
             tabMain.SelectedTab = tabPageLog;
 
             AppendLog("==================================================", Color.FromArgb(90, 90, 90));
-            AppendLog(string.Format("CMD 分析开始：{0} 个「{1}」PDF（不调用 AI，直接读 LT_STEP1.csv）",
-                snapshot.Count, PdfCategoryNames.Assembly), Color.FromArgb(120, 200, 255));
+            AppendLog(string.Format("CMD 分析开始：{0} 个「{1}」PDF（不调用 AI：{2} + 要領図の部品情報）",
+                snapshot.Count, PdfCategoryNames.Assembly, CmdPartAnalyzer.LtStep1FileName),
+                Color.FromArgb(120, 200, 255));
             AppendLog("分解输出目录：" + outputDir, Color.FromArgb(180, 180, 180));
             AppendLog("部品基本信息数据库：" + PartBasicInfoRepository.ResolveDatabasePath(),
                 Color.FromArgb(180, 180, 180));
@@ -1008,7 +984,8 @@ namespace MSIFAITOOLS
         }
 
         /// <summary>
-        /// 初始化分类结果表格的列（序号 / 文件名 / 分类下拉 / 判定依据）。
+        /// 初始化分类结果表格的列（序号 / 文件名 / 分类 / 判定依据），全部只读显示。
+        /// 分类由外部工具生成的 PdfInfoList.txt 决定，本画面只显示、不改判。
         /// </summary>
         private void InitializeClassifyGrid()
         {
@@ -1029,13 +1006,11 @@ namespace MSIFAITOOLS
             colFile.ReadOnly = true;
             colFile.SortMode = DataGridViewColumnSortMode.NotSortable;
 
-            DataGridViewComboBoxColumn colCategory = new DataGridViewComboBoxColumn();
+            DataGridViewTextBoxColumn colCategory = new DataGridViewTextBoxColumn();
             colCategory.Name = "colCategory";
-            colCategory.HeaderText = "分类（未知请在此选择）";
+            colCategory.HeaderText = "分类";
             colCategory.Width = 170;
-            colCategory.FlatStyle = FlatStyle.Flat;
-            colCategory.DisplayStyle = DataGridViewComboBoxDisplayStyle.ComboBox;
-            colCategory.Items.AddRange(PdfCategoryNames.All);
+            colCategory.ReadOnly = true;
             colCategory.SortMode = DataGridViewColumnSortMode.NotSortable;
 
             DataGridViewTextBoxColumn colEvidence = new DataGridViewTextBoxColumn();
@@ -1046,7 +1021,6 @@ namespace MSIFAITOOLS
             colEvidence.SortMode = DataGridViewColumnSortMode.NotSortable;
 
             dgvClassify.Columns.AddRange(new DataGridViewColumn[] { colNo, colFile, colCategory, colEvidence });
-            dgvClassify.EditMode = DataGridViewEditMode.EditOnEnter;
         }
 
         /// <summary>
@@ -1057,7 +1031,6 @@ namespace MSIFAITOOLS
             _classifications = items ?? new List<PdfClassification>();
 
             _lastAutoPreviewKey = null;
-            _suppressCategoryEvent = true;
             _suppressAutoPreview = true;
 
             try
@@ -1080,14 +1053,13 @@ namespace MSIFAITOOLS
             }
             finally
             {
-                _suppressCategoryEvent = false;
                 _suppressAutoPreview = false;
             }
 
             RefreshClassifySummary();
         }
         /// <summary>
-        /// 按分类状态给行着色：未知（待用户选择）为淡黄色，其余为白底。
+        /// 按分类状态给行着色：未知（分类清单里没有该图的记录）为淡黄色，其余为白底。
         /// </summary>
         private void ApplyRowStyle(int rowIndex)
         {
@@ -1119,58 +1091,7 @@ namespace MSIFAITOOLS
         }
 
         /// <summary>
-        /// 用户在分类下拉框里改选分类：更新数据、重画该行并刷新统计。
-        /// </summary>
-        private void DgvClassify_CellValueChanged(object sender, DataGridViewCellEventArgs e)
-        {
-            if (_suppressCategoryEvent || e.RowIndex < 0 || e.ColumnIndex < 0)
-            {
-                return;
-            }
-
-            DataGridViewColumn column = dgvClassify.Columns[e.ColumnIndex];
-
-            if (column == null || column.Name != "colCategory")
-            {
-                return;
-            }
-
-            DataGridViewRow row = dgvClassify.Rows[e.RowIndex];
-            PdfClassification item = row.Tag as PdfClassification;
-
-            if (item == null)
-            {
-                return;
-            }
-
-            PdfCategory category = PdfCategoryNames.Parse(row.Cells[e.ColumnIndex].Value as string);
-
-            if (category == item.Category)
-            {
-                return;
-            }
-
-            item.ApplyManualChoice(category);
-
-            _suppressCategoryEvent = true;
-
-            try
-            {
-                ApplyRowStyle(e.RowIndex);
-            }
-            finally
-            {
-                _suppressCategoryEvent = false;
-            }
-
-            RefreshClassifySummary();
-
-            AppendLog(string.Format("分类调整：{0} → {1}", item.FileName, item.CategoryName),
-                Color.FromArgb(255, 200, 120));
-        }
-
-        /// <summary>
-        /// 下拉框取值异常时静默处理，避免弹出系统错误对话框。
+        /// 表格取值异常时静默处理，避免弹出系统错误对话框。
         /// </summary>
         private void DgvClassify_DataError(object sender, DataGridViewDataErrorEventArgs e)
         {
@@ -1205,18 +1126,10 @@ namespace MSIFAITOOLS
 
         /// <summary>
         /// 双击分类列表中的某一行：显示该 PDF 并前置预览窗口。
-        /// 双击「分类」列时不触发（该列用于直接改分类）。
         /// </summary>
         private void DgvClassify_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
         {
             if (e.RowIndex < 0 || e.ColumnIndex < 0)
-            {
-                return;
-            }
-
-            DataGridViewColumn column = dgvClassify.Columns[e.ColumnIndex];
-
-            if (column != null && column.Name == "colCategory")
             {
                 return;
             }
@@ -1233,11 +1146,11 @@ namespace MSIFAITOOLS
         }
 
         /// <summary>
-        /// 分类结果表格的快捷键：按 Enter 打开当前行的部品基本信息（编辑下拉框时不处理）。
+        /// 分类结果表格的快捷键：按 Enter 打开当前行的部品基本信息。
         /// </summary>
         private void DgvClassify_KeyDown(object sender, KeyEventArgs e)
         {
-            if (e.KeyCode != Keys.Enter || dgvClassify.IsCurrentCellInEditMode)
+            if (e.KeyCode != Keys.Enter)
             {
                 return;
             }
@@ -1507,7 +1420,7 @@ namespace MSIFAITOOLS
         }
 
         /// <summary>
-        /// 刷新分类统计标签（显示各类数量与待选择数量）。
+        /// 刷新分类统计标签（显示各类数量与未知数量）。
         /// </summary>
         private void RefreshClassifySummary()
         {
@@ -1521,7 +1434,7 @@ namespace MSIFAITOOLS
             int unknown = PdfClassifier.Count(_classifications, PdfCategory.Unknown);
 
             lblClassifySummary.Text = PdfClassifier.BuildSummaryText(_classifications) + "\n" +
-                (unknown > 0 ? "待选择 " + unknown + " 个：在「分类」列选择后点击「保存分类结果」" : "全部已确定");
+                (unknown > 0 ? "未知 " + unknown + " 个：分类清单（PdfInfoList.txt）里没有记录" : "全部已确定");
 
             lblClassifySummary.ForeColor = unknown > 0
                 ? Color.FromArgb(198, 40, 40)
@@ -1529,43 +1442,8 @@ namespace MSIFAITOOLS
         }
 
         /// <summary>
-        /// 保存（或覆盖）分类汇总 CSV：&lt;PDF 文件夹&gt;\classify\classification.csv。
-        /// </summary>
-        private void BtnSaveClassify_Click(object sender, EventArgs e)
-        {
-            if (_classifications == null || _classifications.Count == 0)
-            {
-                MessageBox.Show(this, "还没有分类结果，请先执行 PDF 分解。", "提示",
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
-                return;
-            }
-
-            if (string.IsNullOrEmpty(_classifyDirectory))
-            {
-                MessageBox.Show(this, "分类结果目录未知，请先执行 PDF 分解。", "提示",
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
-                return;
-            }
-
-            try
-            {
-                string path = PdfClassifier.SaveSummary(_classifyDirectory, _classifications);
-
-                AppendLog("分类结果已保存：" + path, Color.FromArgb(150, 220, 150));
-                SetStatus("分类结果已保存（" + _classifications.Count + " 个 PDF）", Color.FromArgb(46, 125, 50));
-
-                MessageBox.Show(this, "分类结果已保存：\n\n" + path, "完成",
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(this, "保存分类结果失败：\n" + ex.Message, "异常",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
-
-        /// <summary>
-        /// 打开分类结果目录（&lt;PDF 文件夹&gt;\AiAppData\classify）。
+        /// 打开分类清单目录（&lt;PDF 文件夹&gt;\AiAppData\classify），
+        /// 便于查看 / 由外部工具维护其中的 PdfInfoList.txt。
         /// </summary>
         private void BtnOpenClassifyDir_Click(object sender, EventArgs e)
         {

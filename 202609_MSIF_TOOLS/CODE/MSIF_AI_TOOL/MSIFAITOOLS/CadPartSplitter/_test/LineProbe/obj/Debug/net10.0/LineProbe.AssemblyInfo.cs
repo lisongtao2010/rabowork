@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("LineProbe")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+890a4a49d840fc1500a3d12bbddc1404f002b10e")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+59f147f500f5119599ab0c099d81579b49ba3a60")]
 [assembly: System.Reflection.AssemblyProductAttribute("LineProbe")]
 [assembly: System.Reflection.AssemblyTitleAttribute("LineProbe")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

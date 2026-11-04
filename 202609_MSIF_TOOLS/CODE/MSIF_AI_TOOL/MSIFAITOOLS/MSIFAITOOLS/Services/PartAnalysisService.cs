@@ -11,7 +11,7 @@ namespace MSIFAITOOLS.Services
         /// <summary>没有 plu_table.txt（尚未执行分解）。</summary>
         MissingTableFile,
 
-        /// <summary>【CMD 分析】没有 LT_STEP1.csv（CadPartSplitter 未生成）。</summary>
+        /// <summary>【CMD 分析】没有 01_アッセンブリ図_部品機能情報.csv（CadPartSplitter 未生成）。</summary>
         MissingLtStep1File,
 
         /// <summary>AI 没有提取到部品明细（无符合表头或番号不连续等）。</summary>
@@ -95,6 +95,18 @@ namespace MSIFAITOOLS.Services
 
         /// <summary>坐标校验不符的条数。</summary>
         public int VerifiedFailedCount { get; set; }
+
+        /// <summary>追加步骤（要領図 部品）：处理到的 アッセンブリ図 数量。</summary>
+        public int InstructionDrawingCount { get; set; }
+
+        /// <summary>追加步骤（要領図 部品）：读到的 02_要領図_部品機能情報.csv 个数。</summary>
+        public int InstructionFileCount { get; set; }
+
+        /// <summary>追加步骤（要領図 部品）：命中分类依据并登录的行数。</summary>
+        public int InstructionRowCount { get; set; }
+
+        /// <summary>追加步骤（要領図 部品）：缺少 01 / 02 文件的个数。</summary>
+        public int InstructionMissingFileCount { get; set; }
     }
 
     /// <summary>
@@ -292,7 +304,7 @@ namespace MSIFAITOOLS.Services
             }
         }
 
-        /// <summary>从一览中挑出「アッセンブリ図」（含用户手动改判的）。</summary>
+        /// <summary>从一览中挑出「アッセンブリ図」（分类来自 PdfInfoList.txt，本画面不改判）。</summary>
         public static List<PdfClassification> SelectAssemblyTargets(IList<PdfClassification> classifications)
         {
             List<PdfClassification> targets = new List<PdfClassification>();

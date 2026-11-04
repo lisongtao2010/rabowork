@@ -65,7 +65,8 @@ namespace CadPartSplitter
                 Console.WriteLine("[窗口] px x∈[" + wx1 + "," + wx2 + "] y∈[" + wy1 + "," + wy2 + "]");
 
                 DumpPaths(page, pageH, scale, wx1, wy1, wx2, wy2, minSpan);
-                DumpLines(page, pageH, scale, wx1, wy1, wx2, wy2);
+                List<HLine> hor = DumpLines(page, pageH, scale, wx1, wy1, wx2, wy2);
+                DumpWords(page, pageH, scale, wx1, wy1, wx2, wy2, hor);
             }
 
             return 0;
@@ -136,7 +137,16 @@ namespace CadPartSplitter
 
         // ── 横线 / 竖线（判定与 RuledTableExtractor 完全一致） ────────────────
 
-        private static void DumpLines(
+        /// <summary>一条水平线（页面像素坐标：y 自上而下算）。</summary>
+        private class HLine
+        {
+            public double Y;
+            public double X1;
+            public double X2;
+        }
+
+        /// <summary>打印窗口里的横线 / 竖线，并把全部横线返回给「词 ↔ 线」对照用。</summary>
+        private static List<HLine> DumpLines(
             Page page, double pageH, double scale, double wx1, double wy1, double wx2, double wy2)
         {
             double tol = TolMm * PtPerMm;
@@ -144,6 +154,7 @@ namespace CadPartSplitter
 
             var hor = new List<string>();
             var ver = new List<string>();
+            var allHor = new List<HLine>();
 
             foreach (var path in page.ExperimentalAccess.Paths)
             {
@@ -162,6 +173,8 @@ namespace CadPartSplitter
                             double y = (pageH - (p.Y + q.Y) / 2.0) * scale;
                             double xa = Math.Min(p.X, q.X) * scale;
                             double xb = Math.Max(p.X, q.X) * scale;
+
+                            allHor.Add(new HLine { Y = y, X1 = xa, X2 = xb });
 
                             if (y < wy1 || y > wy2 || xb < wx1 || xa > wx2) continue;
 
@@ -195,6 +208,71 @@ namespace CadPartSplitter
             Console.WriteLine();
             Console.WriteLine("== 窗口里的竖线（" + ver.Count + " 条） ==");
             foreach (string s in ver) Console.WriteLine("  " + s);
+
+            return allHor;
+        }
+
+        // ── 词 ↔ 横线 对照 ──────────────────────────────────────────────────
+
+        /// <summary>
+        /// 打印窗口里的词，并列出「y 落在该词字身高度之内、水平方向与词有重叠」的横线。
+        ///
+        /// 这类线就是 取り消し線（划掉整行的删除线）：`中` 表示落点在该词字身的中间一半
+        /// （上下各让出 1/4 高度）—— 写字时下划线只会在字身底下、上划线只在字身顶上，
+        /// 只有「划掉」才会从中间穿过。
+        /// </summary>
+        private static void DumpWords(
+            Page page, double pageH, double scale, double wx1, double wy1, double wx2, double wy2,
+            List<HLine> hor)
+        {
+            Console.WriteLine();
+            Console.WriteLine("== 窗口里的词（← 后面是穿过它的横线）==");
+
+            int count = 0;
+
+            foreach (Word w in page.GetWords())
+            {
+                var bb = w.BoundingBox;
+
+                double x1 = bb.Left * scale;
+                double x2 = bb.Right * scale;
+                double yTop = (pageH - bb.Top) * scale;      // 上边（像素 y 小）
+                double yBot = (pageH - bb.Bottom) * scale;   // 下边（像素 y 大）
+
+                if (x2 < wx1 || x1 > wx2 || yBot < wy1 || yTop > wy2) continue;
+                if (x2 - x1 <= 0 || yBot - yTop <= 0) continue;
+
+                count++;
+
+                double h = yBot - yTop;
+                double midA = yTop + h * 0.25;
+                double midB = yBot - h * 0.25;
+
+                var hits = new List<string>();
+
+                foreach (var l in hor)
+                {
+                    if (l.Y <= yTop || l.Y >= yBot) continue;          // 不在字身高度之内
+                    if (l.X2 < x1 || l.X1 > x2) continue;              // 水平方向不重叠
+
+                    double cover = Math.Min(l.X2, x2) - Math.Max(l.X1, x1);
+
+                    hits.Add("y=" + l.Y.ToString("0.#")
+                             + ((l.Y >= midA && l.Y <= midB) ? "(中)" : "(边)")
+                             + " x=" + l.X1.ToString("0") + "~" + l.X2.ToString("0")
+                             + " 覆盖率=" + (cover / (x2 - x1)).ToString("0%"));
+                }
+
+                Console.WriteLine("  \"" + (w.Text ?? string.Empty) + "\""
+                                  + "  x=" + x1.ToString("0.#") + "~" + x2.ToString("0.#")
+                                  + "  y=" + yTop.ToString("0.#") + "~" + yBot.ToString("0.#")
+                                  + "  h=" + h.ToString("0.#")
+                                  + (hits.Count == 0
+                                      ? string.Empty
+                                      : "  ← " + hits.Count + " 条: " + string.Join(" / ", hits)));
+            }
+
+            Console.WriteLine("  （共 " + count + " 个词）");
         }
 
         // ── 工具 ─────────────────────────────────────────────────────────────

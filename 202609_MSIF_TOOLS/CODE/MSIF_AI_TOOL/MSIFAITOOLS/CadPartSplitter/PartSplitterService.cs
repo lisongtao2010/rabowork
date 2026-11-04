@@ -166,13 +166,29 @@ namespace CadPartSplitter
                     filePath, opts.PdfPageIndex, imgWidth, imgHeight, opts);
 
                 if (tables.Count > 0)
-                {
                     RuledTableWriter.Save(tables, opts.OutputDirectory, filePath, opts);
 
-                    // 部品表「下表参照」展开 → LT_STEP1.csv（下游 AI 环节按这个文件名取）
+                // PDF 信息清单（図番号 / 文件名 / 图面分类 / 分类依据）
+                // → <输出根目录>\classify\PdfInfoList.txt（整批共用一份，同一张图就更新那一行）
+                // 有没有表格都写：分类与表格张数无关（没有 tables 时分类留空）。
+                // 后面的两个成品清单都要读它：01_… 只有「アッセンブリ図」才写，02_… 只有「要領図」才写。
+                PdfInfoListBuilder.Build(filePath, opts.OutputDirectory, parts.Count, tables.Count,
+                                         imgWidth, imgHeight, opts);
+
+                if (tables.Count > 0)
+                {
+                    // 部品表「下表参照」展开 → 01_アッセンブリ図_部品機能情報.csv
+                    // 只有分类清单判为「アッセンブリ図」的图纸才写，其余图类跳过。
                     LtStep1Builder.Build(opts.OutputDirectory, opts);
 
-                    // 「品種 + 多列重复」表摊平 → LT_STEP2.csv
+                    // 「項目 / 要領図漢字 / 図番」表 → 01_アッセンブリ図_要領図.csv
+                    // 同样是只有アッセンブリ図才写：这张組立図用到了哪些要領図（図番 固定 10 位）。
+                    AssemblyYoryoBuilder.Build(opts.OutputDirectory, opts);
+
+                    // 「品種 + 多列重复」表摊平 → 02_要領図_部品機能情報.csv
+                    // 放在最后一步：只有分类清单判为「要領図」的图纸才写，其余图类跳过。
+                    // 两者都只读 tables\*.csv、各写各的文件，先后顺序不影响内容，
+                    // 这里只固定「两张成品清单都在表格产物之后、且 02_… 最后出」的节奏。
                     LtStep2Builder.Build(opts.OutputDirectory, opts);
                 }
                 else

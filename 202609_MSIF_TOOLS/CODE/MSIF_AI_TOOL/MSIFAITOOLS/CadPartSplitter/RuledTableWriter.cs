@@ -49,6 +49,26 @@ namespace CadPartSplitter
             string csvDir = Path.Combine(outputDirectory, "tables");
             Directory.CreateDirectory(csvDir);
 
+            // 先清掉上一次的 table_NN.csv：表张数会变（划线剔除后几张碎表会并成一张、
+            // 图纸改了也可能少一张），留着旧文件会被 LtStep1Builder 的 tables\*.csv 扫描当成真的读进去。
+            int erased = 0;
+
+            foreach (string old in Directory.GetFiles(csvDir, "table_*.csv"))
+            {
+                try
+                {
+                    File.Delete(old);
+                    erased++;
+                }
+                catch (Exception ex)
+                {
+                    o.Log("[WARN] 旧表格 CSV 删不掉（不影响本次结果）：" + old + " —— " + ex.Message);
+                }
+            }
+
+            if (erased > 0)
+                o.Log("[INFO] Table csv 清理旧文件 " + erased + " 个（" + csvDir + "）");
+
             foreach (var t in tables)
             {
                 string csvPath = Path.Combine(csvDir, t.Name + ".csv");
@@ -88,6 +108,8 @@ namespace CadPartSplitter
                 sb.AppendLine("      \"column_count\": " + t.ColumnCount + ",");
                 sb.AppendLine("      \"cell_count\": " + t.CellCount + ",");
                 sb.AppendLine("      \"text_cell_count\": " + t.TextCellCount + ",");
+                sb.AppendLine("      \"struck_row_count\": " + t.StruckRowCount + ",");
+                sb.AppendLine("      \"visible_row_count\": " + t.VisibleRowCount + ",");
                 sb.AppendLine("      \"rows\": [");
 
                 for (int r = 0; r < t.Rows.Count; r++)
@@ -96,6 +118,7 @@ namespace CadPartSplitter
 
                     sb.AppendLine("        {");
                     sb.AppendLine("          \"index\": " + row.Index + ",");
+                    sb.AppendLine("          \"struck\": " + (row.IsStruck ? "true" : "false") + ",");
                     sb.AppendLine("          \"pixel\": { \"x\": " + row.PixelX + ", \"y\": " + row.PixelY
                                   + ", \"w\": " + row.PixelW + ", \"h\": " + row.PixelH + " },");
                     sb.AppendLine("          \"cells\": [");
@@ -111,6 +134,7 @@ namespace CadPartSplitter
                         sb.AppendLine("              \"column_span\": " + cell.ColumnSpan + ",");
                         sb.AppendLine("              \"text\": \"" + EscapeJson(cell.Text) + "\",");
                         sb.AppendLine("              \"word_count\": " + cell.WordCount + ",");
+                        sb.AppendLine("              \"struck_words\": " + cell.StruckWordCount + ",");
                         sb.AppendLine("              \"pixel\": { \"x\": " + cell.PixelX + ", \"y\": " + cell.PixelY
                                       + ", \"w\": " + cell.PixelW + ", \"h\": " + cell.PixelH + " },");
                         sb.AppendLine("              \"pdf_mm\": { \"x\": " + cell.PdfX_mm.ToString("F2")
@@ -169,11 +193,12 @@ namespace CadPartSplitter
         {
             var sb = new StringBuilder();
 
-            int cellTotal = 0, textCellTotal = 0, mergedTotal = 0;
+            int cellTotal = 0, textCellTotal = 0, mergedTotal = 0, struckRowTotal = 0;
             foreach (var t in tables)
             {
                 cellTotal += t.CellCount;
                 textCellTotal += t.TextCellCount;
+                struckRowTotal += t.StruckRowCount;
 
                 foreach (var row in t.Rows)
                     foreach (var c in row.Cells)
@@ -189,6 +214,9 @@ namespace CadPartSplitter
             sb.AppendLine("# 坐标说明   : 绝对 = 页面像素坐标（左上原点）；mm = 页面毫米坐标");
             sb.AppendLine("# 表格数量   : " + tables.Count + " 张 / 单元格 " + cellTotal
                           + " 个（有文字 " + textCellTotal + " 个，合并单元格 " + mergedTotal + " 个）");
+            if (struckRowTotal > 0)
+                sb.AppendLine("# 划线作废   : " + struckRowTotal + " 行（图纸上用 取り消し線 划掉 = 该行作废，"
+                              + "已从二维表与 tables\\table_NN.csv 剔除，明细里仍可见）");
             sb.AppendLine("# 内容说明   : 二维表里的文字就是该单元格的内容；空单元格留空；");
             sb.AppendLine("#              合并单元格的文字写在左上角那一格，被它覆盖的格子留空（tables\\table_NN.csv 同）");
             sb.AppendLine();
@@ -200,9 +228,14 @@ namespace CadPartSplitter
                               + "  mm(x=" + t.PdfX_mm.ToString("0.##") + " y=" + t.PdfY_mm.ToString("0.##")
                               + " w=" + t.PdfW_mm.ToString("0.##") + " h=" + t.PdfH_mm.ToString("0.##") + ")"
                               + "  行 " + t.RowCount + " / 列 " + t.ColumnCount
-                              + " / 单元格 " + t.CellCount + "（有文字 " + t.TextCellCount + "）");
+                              + " / 单元格 " + t.CellCount + "（有文字 " + t.TextCellCount + "）"
+                              + (t.StruckRowCount > 0
+                                  ? "  划线作废 " + t.StruckRowCount + " 行 → 实出 " + t.VisibleRowCount + " 行"
+                                  : string.Empty));
 
                 AppendGrid(sb, t, "  ");
+
+                AppendStruckRows(sb, t, "  ");
 
                 sb.AppendLine();
                 sb.AppendLine("  单元格明细：");
@@ -212,7 +245,8 @@ namespace CadPartSplitter
                     sb.AppendLine("    行 " + row.Index.ToString().PadLeft(3)
                                   + "  y=" + row.PixelY.ToString().PadRight(5)
                                   + " h=" + row.PixelH.ToString().PadRight(5)
-                                  + "  单元格 " + row.Cells.Count);
+                                  + "  单元格 " + row.Cells.Count
+                                  + (row.IsStruck ? "  ← 划线作废（已从 CSV / 二维表剔除）" : string.Empty));
 
                     foreach (var c in row.Cells)
                     {
@@ -224,7 +258,8 @@ namespace CadPartSplitter
                                       + " y=" + c.PixelY.ToString().PadRight(5)
                                       + " w=" + c.PixelW.ToString().PadRight(5)
                                       + " h=" + c.PixelH.ToString().PadRight(5)
-                                      + " " + (string.IsNullOrEmpty(c.Text) ? "（空）" : CsvFile.SingleLine(c.Text)));
+                                      + " " + (string.IsNullOrEmpty(c.Text) ? "（空）" : CsvFile.SingleLine(c.Text))
+                                      + (c.IsStruck ? "  ← 划线" : string.Empty));
                     }
                 }
 
@@ -238,15 +273,18 @@ namespace CadPartSplitter
         /// <summary>
         /// 用制表符框线把表格内容画成二维表（列宽按显示宽度对齐，CJK 字符算 2）。
         /// 空单元格显示为空白，能直观看出「这一格确实没有字」，不会被误读成漏行漏列。
+        /// 划线作废（取り消し線）的行不画 —— 与 <c>tables\table_NN.csv</c> 保持一致，另行列出。
         /// </summary>
         private static void AppendGrid(StringBuilder sb, RuledTable table, string indent)
         {
-            if (table.RowCount <= 0 || table.ColumnCount <= 0) return;
+            string[][] grid = table.ToVisibleGrid();
 
-            string[][] grid = table.ToGrid();
+            if (grid.Length <= 0 || table.ColumnCount <= 0) return;
+
+            int rowCount = grid.Length;
 
             // 单元格里的换行压成 '~'：否则框线二维表会被撑坏（一格跨成两行）
-            for (int r = 0; r < table.RowCount; r++)
+            for (int r = 0; r < rowCount; r++)
                 for (int c = 0; c < table.ColumnCount; c++)
                     grid[r][c] = CsvFile.SingleLine(grid[r][c]);
 
@@ -256,7 +294,7 @@ namespace CadPartSplitter
             {
                 widths[c] = 1;
 
-                for (int r = 0; r < table.RowCount; r++)
+                for (int r = 0; r < rowCount; r++)
                 {
                     int w = DisplayWidth(grid[r][c]);
                     if (w > widths[c]) widths[c] = w;
@@ -267,7 +305,7 @@ namespace CadPartSplitter
 
             sb.AppendLine(indent + BuildRule(widths, '┌', '┬', '┐'));
 
-            for (int r = 0; r < table.RowCount; r++)
+            for (int r = 0; r < rowCount; r++)
             {
                 sb.Append(indent + "│");
 
@@ -276,11 +314,41 @@ namespace CadPartSplitter
 
                 sb.AppendLine();
 
-                if (r < table.RowCount - 1)
+                if (r < rowCount - 1)
                     sb.AppendLine(indent + BuildRule(widths, '├', '┼', '┤'));
             }
 
             sb.AppendLine(indent + BuildRule(widths, '└', '┴', '┘'));
+        }
+
+        /// <summary>
+        /// 列出被 取り消し線 划掉（图纸上作废）的行 —— 这些行不进 CSV / 二维表，
+        /// 但要在报告里留个痕迹，方便核对「是漏了还是画上划掉了」。
+        /// </summary>
+        private static void AppendStruckRows(StringBuilder sb, RuledTable table, string indent)
+        {
+            if (table.StruckRowCount <= 0) return;
+
+            sb.AppendLine();
+            sb.AppendLine(indent + "划线作废（取り消し線，已从二维表 / tables\\" + table.Name
+                          + ".csv 剔除，图纸上表示该行作废）：");
+
+            foreach (var row in table.Rows)
+            {
+                if (!row.IsStruck) continue;
+
+                var parts = new List<string>();
+
+                foreach (var c in row.Cells)
+                {
+                    string text = CsvFile.SingleLine(c.Text ?? string.Empty);
+                    if (text.Length > 0) parts.Add(text);
+                }
+
+                sb.AppendLine(indent + "  行 " + row.Index.ToString().PadLeft(3)
+                              + "  y=" + row.PixelY.ToString().PadRight(5)
+                              + "  " + (parts.Count == 0 ? "（空）" : string.Join(" | ", parts.ToArray())));
+            }
         }
 
         /// <summary>生成一条表格横线：<c>┌──┬──┐</c> 形式。</summary>
@@ -356,15 +424,16 @@ namespace CadPartSplitter
 
         /// <summary>
         /// 单张表输出成 CSV（一行一记录、一格一列，Excel 可直接打开）。
-        /// 合并单元格的文字写在左上角那一格，被覆盖的格子留空 —— 与 <see cref="RuledTable.ToGrid"/> 一致。
+        /// 合并单元格的文字写在左上角那一格，被覆盖的格子留空 —— 与 <see cref="RuledTable.ToVisibleGrid"/> 一致。
+        /// 划线作废（取り消し線）的行不输出：那张图里这一行已经作废。
         /// 格子里的换行由 <see cref="CsvFile.Escape"/> 压成 `~`（一格一行，避免下游按行读时串行）。
         /// </summary>
         private static void SaveCsv(RuledTable table, string path)
         {
             var sb = new StringBuilder();
-            string[][] grid = table.ToGrid();
+            string[][] grid = table.ToVisibleGrid();
 
-            for (int r = 0; r < table.RowCount; r++)
+            for (int r = 0; r < grid.Length; r++)
             {
                 for (int c = 0; c < table.ColumnCount; c++)
                 {

@@ -11,6 +11,11 @@
     <LangVersion>7.3</LangVersion>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- 链接进来的 RuledTableExtractor.cs 要用 PdfPig 的类型；与 TableProbe 同一版本 -->
+    <PackageReference Include="PdfPig" Version="0.1.9" />
+  </ItemGroup>
+
   <!--
     探针直接链接主工程的源文件（而不是复制一份逻辑），
     保证「探针验证的规则」与「CadPartSplitter.exe 实际写出的 CSV」是同一份代码。
@@ -20,6 +25,7 @@
     <Compile Include="..\..\CsvFile.cs" Link="Linked\CsvFile.cs" />
     <Compile Include="..\..\RuledTable.cs" Link="Linked\RuledTable.cs" />
     <Compile Include="..\..\RuledTableWriter.cs" Link="Linked\RuledTableWriter.cs" />
+    <Compile Include="..\..\RuledTableExtractor.cs" Link="Linked\RuledTableExtractor.cs" />
     <Compile Include="..\..\DetectorOptions.cs" Link="Linked\DetectorOptions.cs" />
   </ItemGroup>
 

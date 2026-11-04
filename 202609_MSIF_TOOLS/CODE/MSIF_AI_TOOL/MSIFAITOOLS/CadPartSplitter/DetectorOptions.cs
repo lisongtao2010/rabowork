@@ -320,21 +320,49 @@ namespace CadPartSplitter
         /// </summary>
         public double RuledTableMaxRowGapMm { get; set; } = 120.0;
 
+        // ── PDF 信息清单（PdfInfoList.txt）────────────────────────────────────
+
         /// <summary>
-        /// 是否在表格 CSV 生成之后，再合成下游 AI 环节约定的 <c>LT_STEP1.csv</c>（默认开启）。
+        /// 是否生成「PDF 信息清单」<c>classify\PdfInfoList.txt</c>（默认开启，仅 PDF 生效）。
+        ///
+        /// 整批共用一份，放在输出根目录下的 <c>classify</c> 里：
+        /// 单张是 <c>&lt;图纸目录&gt;\AiAppData\classify\PdfInfoList.txt</c>，
+        /// 批量是 <c>&lt;输出根目录&gt;\classify\PdfInfoList.txt</c>（<b>不是</b>每张图纸各一份）。
+        /// 一张图一行，固定四列：図番号 / 文件名 / 图面分类（基本図 / 加工図 / アッセンブリ図 / 要領図）/
+        /// 分类依据；同一张图重跑时就地更新那一行。分类判定与 <c>drawing_list.csv</c> 同一套规则
+        /// （在 <c>tables\*.csv</c> 的单元格里找「図番号前 4 位 + 关键字」）。
+        ///
+        /// 生成时机：<c>tables\*.csv</c> 落盘之后、<see cref="BuildLtStep1Table"/> 与
+        /// <see cref="BuildLtStep2Table"/> 之前 —— 后两者要读它，<see cref="BuildLtStep1Table"/>
+        /// 只有分类是「アッセンブリ図」时才写 <c>01_アッセンブリ図_部品機能情報.csv</c>，
+        /// <see cref="BuildLtStep2Table"/> 只有分类是「要領図」时才写 <c>02_要領図_部品機能情報.csv</c>。
+        /// 命令行对应 `--no-pdf-info-list`。
+        /// </summary>
+        public bool BuildPdfInfoList { get; set; } = true;
+
+        /// <summary>
+        /// 是否在表格 CSV 生成之后，再合成下游 AI 环节约定的
+        /// <c>01_アッセンブリ図_部品機能情報.csv</c>（默认开启；旧文件名 <c>LT_STEP1.csv</c>）。
         ///
         /// 做法：遍历 <c>tables\table_NN.csv</c> ——
         ///   · 表头同时含「番号」「部品名」「部品コード」的是部品表（主表），取它的明细行；
         ///   · 明细行里「部品コード」写「下表参照」的，往后找第一张含「部品コード」列的参照表
         ///     （图纸上位于下方的那张小表），它有 N 条明细就把这一行拆成 N 条，
         ///     只把「部品コード」换成参照表里的值，其余列沿用原行；
-        ///   · 合成结果按 <see cref="OutputDirectory"/> 写成 <c>LT_STEP1.csv</c>（带 BOM 的 UTF-8）。
+        ///   · 合成结果按 <see cref="OutputDirectory"/> 写成
+        ///     <c>01_アッセンブリ図_部品機能情報.csv</c>（带 BOM 的 UTF-8）。
+        ///   · **只有图面分类为「アッセンブリ図」的图纸才写**：分类读自
+        ///     <c>classify\PdfInfoList.txt</c>（<see cref="BuildPdfInfoList"/>），基本図 / 加工図 / 要領図 /
+        ///     未识别 一律跳过，并清掉上一次留下的同名产物。
+        /// 生成时机在 <see cref="BuildLtStep2Table"/> 之前（先出 <c>01_…</c>，再出 <c>02_…</c>；
+        /// 只读 <c>tables\*.csv</c>）。
         /// 找不到部品表、或没有「下表参照」行时什么都不写（只记日志）。命令行对应 `--no-lt-step1`。
         /// </summary>
         public bool BuildLtStep1Table { get; set; } = true;
 
         /// <summary>
-        /// 是否把「品種 + 多列重复」的表格摊平，合成下游 AI 环节约定的 <c>LT_STEP2.csv</c>（默认开启）。
+        /// 是否把「品種 + 多列重复」的表格摊平，合成下游 AI 环节约定的
+        /// <c>02_要領図_部品機能情報.csv</c>（默认开启；旧文件名 <c>LT_STEP2.csv</c>）。
         ///
         /// 图纸上这类表把同一个品種的几组部品横向排开，表头重复出现：
         /// <code>
@@ -346,10 +374,40 @@ namespace CadPartSplitter
         ///   · 表头区里有含「品種」的单元格，且同一列名重复出现 ≥ 2 次的是品種表；
         ///   · 重复列名每次出现的列 = 一组部品ブロック，块标题（上方单元格里的「部品名 ： …」）就是品名；
         ///   · 摊平成 品種 / 部品名 / 部品コード / 員数 四列，品種按合并单元格往下填满；
-        ///   · 结果按 <see cref="OutputDirectory"/> 写成 <c>LT_STEP2.csv</c>（带 BOM 的 UTF-8）。
-        /// 找不到这种表时什么都不写（只记日志）。命令行对应 `--no-lt-step2`。
+        ///   · 结果按 <see cref="OutputDirectory"/> 写成 <c>02_要領図_部品機能情報.csv</c>（带 BOM 的 UTF-8）。
+        ///   · **只有图面分类为「要領図」的图纸才写**：分类读自 <c>classify\PdfInfoList.txt</c>
+        ///     （<see cref="BuildPdfInfoList"/>），基本図 / 加工図 / アッセンブリ図 / 未识别 一律跳过，
+        ///     并清掉上一次留下的同名产物。
+        /// 找不到这种表时什么都不写（只记日志）。生成时机在 <see cref="BuildLtStep1Table"/> 之后
+        /// （两张成品清单里最后出）。命令行对应 `--no-lt-step2`。
         /// </summary>
         public bool BuildLtStep2Table { get; set; } = true;
+
+        /// <summary>
+        /// 是否把「項目 / 要領図漢字 / 図番」这种表抽成下游 AI 环节约定的
+        /// <c>01_アッセンブリ図_要領図.csv</c>（默认开启）。
+        ///
+        /// 图纸上这张小表列的是「这张組立図用到了哪些要領図」，样子（表头被拆散、中间那列没有标题）：
+        /// <code>
+        /// ,,,項目,,,,,,,,,,,,図番,
+        /// ,,,"A,M",,枠 縦枠/小縦枠スペーサー取付要領図,,,,,,H310U10022,
+        /// ,,,B,,枠 ロットNO.ラベル 貼付要領図,,,,,,H310U10034,
+        /// </code>
+        /// 做法：遍历 <c>tables\table_NN.csv</c> ——
+        ///   · 表头（含「項目」与「図番」的那一行）同时出现这两个词的才是对象文件，其余表格跳过；
+        ///   · 「項目」「図番」按列名找；「要領図漢字」多数图纸上没有标题，就取「項目」与「図番」
+        ///     之间第一条有内容的列（表头里写了这个列名时优先按列名找）；
+        ///   · 表头下面一行一条，读到「図番」为空或不是 10 位（<c>H310U10022</c> 这类）就停 ——
+        ///     再往下是表題欄、変更履歴表之类的杂行；
+        ///   · 摊平成 項目 / 要領図漢字 / 図番 三列，按 <see cref="OutputDirectory"/> 写成
+        ///     <c>01_アッセンブリ図_要領図.csv</c>（带 BOM 的 UTF-8 + CRLF）。
+        ///   · **只有图面分类为「アッセンブリ図」的图纸才写**：分类读自 <c>classify\PdfInfoList.txt</c>
+        ///     （<see cref="BuildPdfInfoList"/>），基本図 / 加工図 / 要領図 / 未识别 一律跳过，
+        ///     并清掉上一次留下的同名产物。
+        /// 生成时机在 <see cref="BuildLtStep1Table"/> 之后、<see cref="BuildLtStep2Table"/> 之前。
+        /// 没有这种表时不生成文件（只记日志）。命令行对应 `--no-assembly-yoryo`。
+        /// </summary>
+        public bool BuildAssemblyYoryoList { get; set; } = true;
 
         // ── 输出 ─────────────────────────────────────────────────────────────
 

@@ -97,6 +97,7 @@
     <Compile Include="Services\PartCoordinateVerifier.cs" />
     <Compile Include="Services\CmdPartAnalyzer.cs" />
     <Compile Include="Services\CmdPartAnalysisService.cs" />
+    <Compile Include="Services\CmdInstructionPartCollector.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

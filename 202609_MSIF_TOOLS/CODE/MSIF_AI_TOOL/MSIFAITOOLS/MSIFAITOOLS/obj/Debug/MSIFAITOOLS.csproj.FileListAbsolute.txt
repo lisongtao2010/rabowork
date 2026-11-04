@@ -106,3 +106,4 @@ C:\Users\11043787\AppData\Local\Temp\msif_build_out\x86\pdfium.dll
 C:\Users\11043787\AppData\Local\Temp\msif_build_out\MSIFAITOOLS.exe.config
 C:\Users\11043787\AppData\Local\Temp\msif_build_out\MSIFAITOOLS.exe
 C:\Users\11043787\AppData\Local\Temp\msif_build_out\MSIFAITOOLS.pdb
+D:\Github_lis2010\rabowork\202609_MSIF_TOOLS\CODE\MSIF_AI_TOOL\MSIFAITOOLS\MSIFAITOOLS\obj\Debug\MSIFAITOOLS.exe.config

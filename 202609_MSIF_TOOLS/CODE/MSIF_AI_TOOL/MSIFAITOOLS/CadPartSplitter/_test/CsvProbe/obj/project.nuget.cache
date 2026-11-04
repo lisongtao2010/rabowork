@@ -1,8 +1,10 @@
 {
   "version": 2,
-  "dgSpecHash": "XPdHEZibZGA=",
+  "dgSpecHash": "Zm7nVrRoPF8=",
   "success": true,
   "projectFilePath": "D:\\Github_lis2010\\rabowork\\202609_MSIF_TOOLS\\CODE\\MSIF_AI_TOOL\\MSIFAITOOLS\\CadPartSplitter\\_test\\CsvProbe\\CsvProbe.csproj",
-  "expectedPackageFiles": [],
+  "expectedPackageFiles": [
+    "C:\\Users\\11043787\\.nuget\\packages\\pdfpig\\0.1.9\\pdfpig.0.1.9.nupkg.sha512"
+  ],
   "logs": []
 }

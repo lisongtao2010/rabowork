@@ -3,7 +3,27 @@
   "WorkspaceRootPath": "D:\\Github_lis2010\\rabowork\\202609_MSIF_TOOLS\\CODE\\MSIF_AI_TOOL\\MSIFAITOOLS\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{C9B682EF-105F-4478-81DD-A78C865A2E6C}|MSIFAITOOLS\\MSIFAITOOLS.csproj|d:\\github_lis2010\\rabowork\\202609_msif_tools\\code\\msif_ai_tool\\msifaitools\\msifaitools\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form",
+      "AbsoluteMoniker": "D:0:0:{8F3A2C1E-4B7D-4E9A-9C2F-1A2B3C4D5E6F}|CadPartSplitter\\CadPartSplitter.csproj|d:\\github_lis2010\\rabowork\\202609_msif_tools\\code\\msif_ai_tool\\msifaitools\\cadpartsplitter\\mainform.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form",
+      "RelativeMoniker": "D:0:0:{8F3A2C1E-4B7D-4E9A-9C2F-1A2B3C4D5E6F}|CadPartSplitter\\CadPartSplitter.csproj|solutionrelative:cadpartsplitter\\mainform.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{C9B682EF-105F-4478-81DD-A78C865A2E6C}|MSIFAITOOLS\\MSIFAITOOLS.csproj|D:\\Github_lis2010\\rabowork\\202609_MSIF_TOOLS\\CODE\\MSIF_AI_TOOL\\MSIFAITOOLS\\msifaitools\\services\\pdfclassifier.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{C9B682EF-105F-4478-81DD-A78C865A2E6C}|MSIFAITOOLS\\MSIFAITOOLS.csproj|solutionrelative:msifaitools\\services\\pdfclassifier.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{C9B682EF-105F-4478-81DD-A78C865A2E6C}|MSIFAITOOLS\\MSIFAITOOLS.csproj|D:\\Github_lis2010\\rabowork\\202609_MSIF_TOOLS\\CODE\\MSIF_AI_TOOL\\MSIFAITOOLS\\msifaitools\\services\\pdfsplitservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{C9B682EF-105F-4478-81DD-A78C865A2E6C}|MSIFAITOOLS\\MSIFAITOOLS.csproj|solutionrelative:msifaitools\\services\\pdfsplitservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{C9B682EF-105F-4478-81DD-A78C865A2E6C}|MSIFAITOOLS\\MSIFAITOOLS.csproj|D:\\Github_lis2010\\rabowork\\202609_MSIF_TOOLS\\CODE\\MSIF_AI_TOOL\\MSIFAITOOLS\\msifaitools\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{C9B682EF-105F-4478-81DD-A78C865A2E6C}|MSIFAITOOLS\\MSIFAITOOLS.csproj|solutionrelative:msifaitools\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{C9B682EF-105F-4478-81DD-A78C865A2E6C}|MSIFAITOOLS\\MSIFAITOOLS.csproj|D:\\Github_lis2010\\rabowork\\202609_MSIF_TOOLS\\CODE\\MSIF_AI_TOOL\\MSIFAITOOLS\\msifaitools\\pdfpreviewform.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form",
+      "RelativeMoniker": "D:0:0:{C9B682EF-105F-4478-81DD-A78C865A2E6C}|MSIFAITOOLS\\MSIFAITOOLS.csproj|solutionrelative:msifaitools\\pdfpreviewform.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{C9B682EF-105F-4478-81DD-A78C865A2E6C}|MSIFAITOOLS\\MSIFAITOOLS.csproj|D:\\Github_lis2010\\rabowork\\202609_MSIF_TOOLS\\CODE\\MSIF_AI_TOOL\\MSIFAITOOLS\\msifaitools\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form",
       "RelativeMoniker": "D:0:0:{C9B682EF-105F-4478-81DD-A78C865A2E6C}|MSIFAITOOLS\\MSIFAITOOLS.csproj|solutionrelative:msifaitools\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form"
     },
     {
@@ -15,10 +35,6 @@
     {
       "AbsoluteMoniker": "D:0:0:{C9B682EF-105F-4478-81DD-A78C865A2E6C}|MSIFAITOOLS\\MSIFAITOOLS.csproj|D:\\Github_lis2010\\rabowork\\202609_MSIF_TOOLS\\CODE\\MSIF_AI_TOOL\\MSIFAITOOLS\\msifaitools\\prompts\\aipartanalyzer.prompt.txt||{8B382828-6202-11D1-8870-0000F87579D2}",
       "RelativeMoniker": "D:0:0:{C9B682EF-105F-4478-81DD-A78C865A2E6C}|MSIFAITOOLS\\MSIFAITOOLS.csproj|solutionrelative:msifaitools\\prompts\\aipartanalyzer.prompt.txt||{8B382828-6202-11D1-8870-0000F87579D2}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{C9B682EF-105F-4478-81DD-A78C865A2E6C}|MSIFAITOOLS\\MSIFAITOOLS.csproj|D:\\Github_lis2010\\rabowork\\202609_MSIF_TOOLS\\CODE\\MSIF_AI_TOOL\\MSIFAITOOLS\\msifaitools\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{C9B682EF-105F-4478-81DD-A78C865A2E6C}|MSIFAITOOLS\\MSIFAITOOLS.csproj|solutionrelative:msifaitools\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
   ],
   "DocumentGroupContainers": [
@@ -28,7 +44,7 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 7,
+          "SelectedChildIndex": 5,
           "Children": [
             {
               "$type": "Bookmark",
@@ -52,7 +68,54 @@
             },
             {
               "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "MainForm.cs [\u30C7\u30B6\u30A4\u30F3]",
+              "DocumentMoniker": "D:\\Github_lis2010\\rabowork\\202609_MSIF_TOOLS\\CODE\\MSIF_AI_TOOL\\MSIFAITOOLS\\CadPartSplitter\\MainForm.cs",
+              "RelativeDocumentMoniker": "CadPartSplitter\\MainForm.cs",
+              "ToolTip": "D:\\Github_lis2010\\rabowork\\202609_MSIF_TOOLS\\CODE\\MSIF_AI_TOOL\\MSIFAITOOLS\\CadPartSplitter\\MainForm.cs [\u30C7\u30B6\u30A4\u30F3]",
+              "RelativeToolTip": "CadPartSplitter\\MainForm.cs [\u30C7\u30B6\u30A4\u30F3]",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-11-04T04:33:30.642Z",
+              "EditorCaption": " [\u30C7\u30B6\u30A4\u30F3]"
+            },
+            {
+              "$type": "Document",
               "DocumentIndex": 1,
+              "Title": "PdfClassifier.cs",
+              "DocumentMoniker": "D:\\Github_lis2010\\rabowork\\202609_MSIF_TOOLS\\CODE\\MSIF_AI_TOOL\\MSIFAITOOLS\\MSIFAITOOLS\\Services\\PdfClassifier.cs",
+              "RelativeDocumentMoniker": "MSIFAITOOLS\\Services\\PdfClassifier.cs",
+              "ToolTip": "D:\\Github_lis2010\\rabowork\\202609_MSIF_TOOLS\\CODE\\MSIF_AI_TOOL\\MSIFAITOOLS\\MSIFAITOOLS\\Services\\PdfClassifier.cs",
+              "RelativeToolTip": "MSIFAITOOLS\\Services\\PdfClassifier.cs",
+              "ViewState": "AgIAAP4AAAAAAAAAAAAqwLwAAAA0AAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-11-04T03:32:18.291Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "PdfSplitService.cs",
+              "DocumentMoniker": "D:\\Github_lis2010\\rabowork\\202609_MSIF_TOOLS\\CODE\\MSIF_AI_TOOL\\MSIFAITOOLS\\MSIFAITOOLS\\Services\\PdfSplitService.cs",
+              "RelativeDocumentMoniker": "MSIFAITOOLS\\Services\\PdfSplitService.cs",
+              "ToolTip": "D:\\Github_lis2010\\rabowork\\202609_MSIF_TOOLS\\CODE\\MSIF_AI_TOOL\\MSIFAITOOLS\\MSIFAITOOLS\\Services\\PdfSplitService.cs",
+              "RelativeToolTip": "MSIFAITOOLS\\Services\\PdfSplitService.cs",
+              "ViewState": "AgIAAI4AAAAAAAAAAAAiwHAAAAAaAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-11-04T03:27:52.142Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
+              "Title": "PdfPreviewForm.cs [\u30C7\u30B6\u30A4\u30F3]",
+              "DocumentMoniker": "D:\\Github_lis2010\\rabowork\\202609_MSIF_TOOLS\\CODE\\MSIF_AI_TOOL\\MSIFAITOOLS\\MSIFAITOOLS\\PdfPreviewForm.cs",
+              "RelativeDocumentMoniker": "MSIFAITOOLS\\PdfPreviewForm.cs",
+              "ToolTip": "D:\\Github_lis2010\\rabowork\\202609_MSIF_TOOLS\\CODE\\MSIF_AI_TOOL\\MSIFAITOOLS\\MSIFAITOOLS\\PdfPreviewForm.cs [\u30C7\u30B6\u30A4\u30F3]",
+              "RelativeToolTip": "MSIFAITOOLS\\PdfPreviewForm.cs [\u30C7\u30B6\u30A4\u30F3]",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-11-04T03:27:06.973Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 6,
               "Title": "CadPartSplitter",
               "DocumentMoniker": "D:\\Github_lis2010\\rabowork\\202609_MSIF_TOOLS\\CODE\\MSIF_AI_TOOL\\MSIFAITOOLS\\CadPartSplitter\\CadPartSplitter.csproj",
               "RelativeDocumentMoniker": "CadPartSplitter\\CadPartSplitter.csproj",
@@ -63,7 +126,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 3,
+              "DocumentIndex": 8,
               "Title": "AiPartAnalyzer.Prompt.txt",
               "DocumentMoniker": "D:\\Github_lis2010\\rabowork\\202609_MSIF_TOOLS\\CODE\\MSIF_AI_TOOL\\MSIFAITOOLS\\MSIFAITOOLS\\Prompts\\AiPartAnalyzer.Prompt.txt",
               "RelativeDocumentMoniker": "MSIFAITOOLS\\Prompts\\AiPartAnalyzer.Prompt.txt",
@@ -75,19 +138,18 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 0,
+              "DocumentIndex": 5,
               "Title": "Form1.cs [\u30C7\u30B6\u30A4\u30F3]",
               "DocumentMoniker": "D:\\Github_lis2010\\rabowork\\202609_MSIF_TOOLS\\CODE\\MSIF_AI_TOOL\\MSIFAITOOLS\\MSIFAITOOLS\\Form1.cs",
               "RelativeDocumentMoniker": "MSIFAITOOLS\\Form1.cs",
               "ToolTip": "D:\\Github_lis2010\\rabowork\\202609_MSIF_TOOLS\\CODE\\MSIF_AI_TOOL\\MSIFAITOOLS\\MSIFAITOOLS\\Form1.cs [\u30C7\u30B6\u30A4\u30F3]",
               "RelativeToolTip": "MSIFAITOOLS\\Form1.cs [\u30C7\u30B6\u30A4\u30F3]",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-11-02T01:56:29.917Z",
-              "EditorCaption": " [\u30C7\u30B6\u30A4\u30F3]"
+              "WhenOpened": "2026-11-02T01:56:29.917Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 2,
+              "DocumentIndex": 7,
               "Title": "MSIFAITOOLS",
               "DocumentMoniker": "D:\\Github_lis2010\\rabowork\\202609_MSIF_TOOLS\\CODE\\MSIF_AI_TOOL\\MSIFAITOOLS\\MSIFAITOOLS\\MSIFAITOOLS.csproj",
               "RelativeDocumentMoniker": "MSIFAITOOLS\\MSIFAITOOLS.csproj",
@@ -98,13 +160,13 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 4,
+              "DocumentIndex": 3,
               "Title": "Form1.cs",
               "DocumentMoniker": "D:\\Github_lis2010\\rabowork\\202609_MSIF_TOOLS\\CODE\\MSIF_AI_TOOL\\MSIFAITOOLS\\MSIFAITOOLS\\Form1.cs",
               "RelativeDocumentMoniker": "MSIFAITOOLS\\Form1.cs",
               "ToolTip": "D:\\Github_lis2010\\rabowork\\202609_MSIF_TOOLS\\CODE\\MSIF_AI_TOOL\\MSIFAITOOLS\\MSIFAITOOLS\\Form1.cs",
               "RelativeToolTip": "MSIFAITOOLS\\Form1.cs",
-              "ViewState": "AgIAALkDAAAAAAAAAAAgwNwDAAANAAAAAAAAAA==",
+              "ViewState": "AgIAAJECAAAAAAAAAAAgwK0CAAAcAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2026-10-30T02:24:35.833Z"
             }

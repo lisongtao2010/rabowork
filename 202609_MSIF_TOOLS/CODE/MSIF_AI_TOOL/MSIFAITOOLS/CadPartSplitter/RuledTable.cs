@@ -32,6 +32,18 @@ namespace CadPartSplitter
         /// <summary>组成该单元格文字的词数（0 表示空单元格）。</summary>
         public int WordCount { get; set; }
 
+        /// <summary>
+        /// 该单元格里被「取り消し線（划掉整行的横线）」穿过的词数。
+        /// 大于 0 说明这一格在图纸上被划掉了 —— 通常整行都作废。
+        /// </summary>
+        public int StruckWordCount { get; set; }
+
+        /// <summary>该单元格是否被划线作废。</summary>
+        public bool IsStruck
+        {
+            get { return StruckWordCount > 0; }
+        }
+
         // ── 页面绝对像素坐标 ────────────────────────────────────────────────
         public int PixelX { get; set; }
         public int PixelY { get; set; }
@@ -50,6 +62,12 @@ namespace CadPartSplitter
     {
         /// <summary>行号（从 1 开始，自上而下）。</summary>
         public int Index { get; set; }
+
+        /// <summary>
+        /// 该行是否被划线作废（行内只要有格子被 取り消し線 划掉就算 ——
+        /// CAD 图里「整行划掉」就表示这一行作废，作废行不写进 <c>tables\*.csv</c>）。
+        /// </summary>
+        public bool IsStruck { get; set; }
 
         // 该行所有单元格的并集外接框（页面绝对像素）
         public int PixelX { get; set; }
@@ -118,6 +136,23 @@ namespace CadPartSplitter
             }
         }
 
+        /// <summary>被划线作废的行数（作废行不写进 <c>tables\*.csv</c> 与 <c>tables_text.txt</c> 的二维表）。</summary>
+        public int StruckRowCount
+        {
+            get
+            {
+                int n = 0;
+                foreach (var r in Rows) if (r.IsStruck) n++;
+                return n;
+            }
+        }
+
+        /// <summary>实际输出的行数 = 总行数 − 划线作废行数。</summary>
+        public int VisibleRowCount
+        {
+            get { return RowCount - StruckRowCount; }
+        }
+
         /// <summary>
         /// 把表展开成二维文本网格（<c>[行][列]</c>，均从 0 开始，与 <see cref="Rows"/> 顺序一致）。
         /// 合并单元格只在左上角写文字，其余被覆盖的格子留空 —— CSV / txt 输出都是这个形态。
@@ -146,6 +181,39 @@ namespace CadPartSplitter
             }
 
             return grid;
+        }
+
+        /// <summary>
+        /// 剔除划线作废行之后的二维文字网格（CSV / 二维表用这个）：
+        /// 行按输出顺序重新编号（从 0 开始），列与 <see cref="ColumnCount"/> 一致。
+        ///
+        /// 注意：行号是按横向框线的边界数编的，没有单元格的行（缺格带）也要照旧占一行留空，
+        /// 所以这里是在 <see cref="ToGrid"/> 的结果上「抽掉作废行」，不能改用 <see cref="Rows"/> 重建，
+        /// 否则缺格带上下的行会整体上移（H310C10004 的变更履历表就是这种缺格表）。
+        /// </summary>
+        public string[][] ToVisibleGrid()
+        {
+            string[][] full = ToGrid();
+
+            List<int> struck = null;
+            foreach (var r in Rows)
+            {
+                if (!r.IsStruck) continue;
+                if (struck == null) struck = new List<int>();
+                struck.Add(r.Index);
+            }
+
+            if (struck == null) return full;
+
+            var list = new List<string[]>(full.Length);
+
+            for (int r = 0; r < full.Length; r++)
+            {
+                if (struck.Contains(r + 1)) continue;   // 行号从 1 开始
+                list.Add(full[r]);
+            }
+
+            return list.ToArray();
         }
     }
 }

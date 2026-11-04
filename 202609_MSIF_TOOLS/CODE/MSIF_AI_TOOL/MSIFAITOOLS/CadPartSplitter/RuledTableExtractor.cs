@@ -115,14 +115,32 @@ namespace CadPartSplitter
                         return tables;
                     }
 
-                    // 文字层先读出来：剔除「假行线」要靠它判断横线是不是从文字中间穿过
+                    // 文字层先读出来：识别「取り消し線（划掉整行的横线）」要靠它 ——
+                    // 横线从字身中间穿过、又把字整个盖住，那是 CAD 图里「这一行作废」的画法，不是格子边
                     List<WordBox> words = ReadWords(page);
+                    var struckWords = new bool[words.Count];
 
-                    int falseLines = DropTextCrossingPairs(horizontals, words, tol, minCell);
-                    if (falseLines > 0)
-                        write("[INFO] 表格框线：剔除 " + falseLines + " 条横穿文字的装饰横线"
-                              + "（两条相距 < 最小单元格 " + o.RuledTableMinCellMm.ToString("0.##")
-                              + "mm，那条窄带装不下字，不可能是行边界）→ 横线剩 " + horizontals.Count + " 条");
+                    int strikeLines = DropStrikeLines(
+                        horizontals, words, tol, minCell, struckWords, out List<Seg> strikeSegs);
+
+                    if (strikeLines > 0)
+                    {
+                        write("[INFO] 表格框线：剔除 " + strikeLines + " 条 取り消し線（横穿文字的划线，"
+                              + "不是格子边）→ 横线剩 " + horizontals.Count + " 条");
+
+                        foreach (Seg s in strikeSegs)
+                        {
+                            write("[INFO]   划线 px(y=" + Math.Round((pageH - s.P) * scaleY)
+                                  + " x=" + Math.Round(s.A * scaleX) + "~" + Math.Round(s.B * scaleX) + ")");
+                        }
+                    }
+
+                    int struckWordsCount = 0;
+                    foreach (bool b in struckWords) if (b) struckWordsCount++;
+
+                    if (struckWordsCount > 0)
+                        write("[INFO] 表格文字：" + struckWordsCount + " 个词被 取り消し線 划掉"
+                              + "（图纸上表示该行作废，不写进 tables\\*.csv）");
 
                     List<Cell> cells = FindCells(horizontals, verticals, tol, minCell, maxRowGap);
                     int rawCells = cells.Count;
@@ -130,6 +148,10 @@ namespace CadPartSplitter
                     // 图框（整页大小的内框）同样「四面有线」，按面积比排除
                     double pageArea = pageW * pageH;
                     cells.RemoveAll(c => CellArea(c) > pageArea * MaxCellAreaRatio);
+
+                    // 孤立矩形（文字笔画凑出来的假格子）先清掉：留着它，下一步会把它包住的真格子当「套娃」误删
+                    int isolatedCells = DropIsolatedCells(cells, tol);
+
                     RemoveContainers(cells, tol);
 
                     // 词中心落在哪个格子就归哪个格子，不看间距；
@@ -140,7 +162,7 @@ namespace CadPartSplitter
 
                     int assignedWords = 0;
                     foreach (var c in byAreaAsc)
-                        assignedWords += FillCell(c, words, used);
+                        assignedWords += FillCell(c, words, used, struckWords);
 
                     List<List<Cell>> groups = GroupCells(cells, tol);
 
@@ -159,21 +181,33 @@ namespace CadPartSplitter
                         // 名称按位置序号编，两位补零：tables\table_01.csv … 在资源管理器 / Excel 里也按顺序排
                         tables[i].Name = "table_" + (i + 1).ToString("00");
 
-                    int cellTotal = 0, textCellTotal = 0;
+                    int cellTotal = 0, textCellTotal = 0, struckRowTotal = 0;
                     foreach (var t in tables)
                     {
                         cellTotal += t.CellCount;
                         textCellTotal += t.TextCellCount;
+                        struckRowTotal += t.StruckRowCount;
                     }
 
                     write("[INFO] 表格内容：闭合矩形 " + rawCells + " 个 → 有效单元格 " + cells.Count
-                          + " 个（已排除图框等超大矩形），归成 " + kept + " 张表 / 单元格 " + cellTotal
-                          + " 个（有文字 " + textCellTotal + " 个，共填入 " + assignedWords + " 个词）");
+                          + " 个（已排除图框等超大矩形"
+                          + (isolatedCells > 0
+                              ? "、文字笔画凑出的假矩形 " + isolatedCells + " 个"
+                              : string.Empty)
+                          + "），归成 " + kept + " 张表 / 单元格 " + cellTotal
+                          + " 个（有文字 " + textCellTotal + " 个，共填入 " + assignedWords + " 个词）"
+                          + (struckRowTotal > 0
+                              ? "；划线作废 " + struckRowTotal + " 行（不写进 tables\\*.csv）"
+                              : string.Empty));
 
                     foreach (var t in tables)
                     {
                         write("[TABLE] " + t.Name + "  行 " + t.RowCount + " / 列 " + t.ColumnCount
                               + " / 单元格 " + t.CellCount + "（有文字 " + t.TextCellCount + "）"
+                              + (t.StruckRowCount > 0
+                                  ? "【划线作废 " + t.StruckRowCount + " 行 → 实出 "
+                                    + t.VisibleRowCount + " 行】"
+                                  : string.Empty)
                               + "  绝对(x=" + t.PixelX + " y=" + t.PixelY
                               + " w=" + t.PixelW + " h=" + t.PixelH + ")");
                     }
@@ -394,28 +428,57 @@ namespace CadPartSplitter
             return Math.Max(a.A, b.A) - Math.Min(a.B, b.B);
         }
 
+        // ── 取り消し線（划线作废的行）──────────────────────────────────────────
+
         /// <summary>
-        /// 剔除「假行线」：相距不到一个最小单元格、且夹出来的那条窄带横穿同一行文字的两条横线。
-        ///
-        /// 为什么需要这一步：CAD 图里偶尔会有画在文字上的装饰线 / 白涂线（不是格子的边）。
-        /// 典型例子是 H310U10004 表題欄的「枠 建て付け注意ラベル貼付要領図」——
-        /// 两条相距 1.4mm 的横线从字中间穿过，把那一格切成 34px / 17px / 30px 三段；
-        /// 于是表格凭空多出两行，文字掉进那条「比字还矮」的假行里，
-        /// 结果这一行和同行的「D」（第 15 列）、图号 H310U10025（第 29 列）错开。
-        ///
-        /// 判据：真框线永远不会横穿文字（文字总是写在格子内部），
-        /// 所以「两条线都从同一个词的身高范围内穿过，且词中心在两条线的公共区间里」的组合必是假线。
-        /// 同时要求两条线相距 &lt; <paramref name="minCell"/>（默认 2mm）：这么窄的带子装不下字，
-        /// 不可能是表格的行，去掉两条线把上下两格并回一格才是对的。
+        /// 一条横线要盖住词宽的多大比例才算「划掉」。文字轮廓的碎线（本图的文字也是填充路径）
+        /// 通常只有 2~4%，真正的划线是 100%，差得很远。
         /// </summary>
-        /// <returns>剔除的横线条数（0 表示没有假线）。</returns>
-        private static int DropTextCrossingPairs(
-            List<Seg> horizontals, List<WordBox> words, double tol, double minCell)
+        private const double StrikeCoverRatio = 0.6;
+
+        /// <summary>
+        /// 划线的落点要在字身高度中间的这一段之内（上下各让出 1/4）——
+        /// 写字时的下划线只贴在字身底下、上划线只压着字身顶上，都不会落到中间。
+        /// </summary>
+        private const double StrikeMiddleMargin = 0.25;
+
+        /// <summary>
+        /// 剔除 取り消し線（划掉整行的横线），并把被划掉的词标出来。
+        ///
+        /// 为什么必须剔除：CAD 图把某一行作废时，是在那一行的文字上直接画一条（有时两条）横线。
+        /// 那不是格子边，却被当成行边界 —— H310U10004 表題欄的
+        /// 「枠 建て付け注意ラベル貼付要領図」就是典型：两条相距 1.4mm 的线从字中间穿过，
+        /// 把那一格切成 34px / 17px / 30px 三段，表格凭空多出两行，
+        /// 文字掉进「比字还矮」的假行里，与同行的「D」、「H310U10025」错开。
+        ///
+        /// 判据（两道，满足任一即成划线）：
+        ///   ① 单线：线的 y 落在某个词字身的中间一半、且横向盖住该词 ≥ <see cref="StrikeCoverRatio"/>
+        ///      —— 真框线不会这样：文字写在格子内部，框线最多擦到字身的边；
+        ///   ② 双线：两条相距 &lt; <paramref name="minCell"/> 的线夹住同一个词
+        ///      —— 这么窄的带子装不下字，不可能是行，两条一起丢。
+        ///
+        /// 被划到的词通过 <paramref name="struck"/>（与 <paramref name="words"/> 下标对齐）返回，
+        /// 上层据此把「整行作废」的行从 <c>tables\*.csv</c> 里剔掉。
+        /// </summary>
+        /// <param name="struck">输出：与 <paramref name="words"/> 下标对齐的「被划掉」标记。</param>
+        /// <param name="dropped">输出：被剔除的横线（PDF 单位），仅用于日志。</param>
+        /// <returns>剔除的横线条数（0 表示没有划线）。</returns>
+        private static int DropStrikeLines(
+            List<Seg> horizontals, List<WordBox> words, double tol, double minCell, bool[] struck,
+            out List<Seg> dropped)
         {
-            if (horizontals.Count < 2 || words.Count == 0) return 0;
+            dropped = new List<Seg>();
+
+            if (horizontals.Count == 0 || words.Count == 0) return 0;
 
             var drop = new bool[horizontals.Count];
 
+            // ① 一条线从字身中间穿过、且把字盖住 → 划线
+            for (int i = 0; i < horizontals.Count; i++)
+                if (CrossesWordMiddle(horizontals[i], words, struck))
+                    drop[i] = true;
+
+            // ② 两条贴得很近的线夹着同一个词 → 双线划线
             for (int i = 0; i < horizontals.Count; i++)
             {
                 Seg top = horizontals[i];
@@ -426,10 +489,10 @@ namespace CadPartSplitter
 
                     double height = bottom.P - top.P;
 
-                    if (height <= tol) continue;                        // 同一条线（合并后不该出现，保险）
-                    if (height >= minCell) break;                       // 按 y 升序，再往后只会更远
+                    if (height <= tol) continue;                 // 同一条线（合并后不该出现，保险）
+                    if (height >= minCell) break;                // 按 y 升序，再往后只会更远
 
-                    if (!PairCrossesWord(top, bottom, words, tol)) continue;
+                    if (!PairCrossesWord(top, bottom, words, tol, struck)) continue;
 
                     drop[i] = true;
                     drop[j] = true;
@@ -441,36 +504,75 @@ namespace CadPartSplitter
             for (int i = horizontals.Count - 1; i >= 0; i--)
             {
                 if (!drop[i]) continue;
+                dropped.Add(horizontals[i]);
                 horizontals.RemoveAt(i);
                 removed++;
             }
 
+            dropped.Reverse();   // 从下往上删的，日志里按 y 升序打出来更好读
+
             return removed;
+        }
+
+        /// <summary>
+        /// 横线是否「划掉」了某些词：线的 y 在词身中间一半之内，
+        /// 且横向盖住词宽的 <see cref="StrikeCoverRatio"/> 以上。命中的词标成 struck。
+        /// </summary>
+        private static bool CrossesWordMiddle(Seg h, List<WordBox> words, bool[] struck)
+        {
+            bool hit = false;
+
+            for (int i = 0; i < words.Count; i++)
+            {
+                WordBox w = words[i];
+
+                double height = w.Y2 - w.Y1;
+                if (height <= 0) continue;
+
+                // 词 Y2 = 上边、Y1 = 下边（PDF 单位，Y 向上）
+                if (h.P <= w.Y1 + height * StrikeMiddleMargin) continue;
+                if (h.P >= w.Y2 - height * StrikeMiddleMargin) continue;
+
+                double cover = Math.Min(h.B, w.X2) - Math.Max(h.A, w.X1);
+                if (cover < (w.X2 - w.X1) * StrikeCoverRatio) continue;
+
+                struck[i] = true;
+                hit = true;
+            }
+
+            return hit;
         }
 
         /// <summary>
         /// 两条横线（相距 &lt; 最小单元格）是否从同一个词中间穿过：
         /// 两条线在竖直方向都落在词的高度之内（各留 <paramref name="tol"/> 余量），
         /// 且词中心在两条线的公共水平区间内 —— 即那个词确实被这两条线夹住 / 切开。
+        /// 命中的词一并标成 struck。
         /// </summary>
-        private static bool PairCrossesWord(Seg top, Seg bottom, List<WordBox> words, double tol)
+        private static bool PairCrossesWord(
+            Seg top, Seg bottom, List<WordBox> words, double tol, bool[] struck)
         {
             double a = Math.Max(top.A, bottom.A);   // 两条线的公共水平区间
             double b = Math.Min(top.B, bottom.B);
             if (b - a <= 0) return false;
 
-            foreach (var w in words)
+            bool hit = false;
+
+            for (int i = 0; i < words.Count; i++)
             {
+                WordBox w = words[i];
+
                 // 词 Y2 = 上边、Y1 = 下边（PDF 单位，Y 向上）
                 if (top.P <= w.Y1 + tol || bottom.P >= w.Y2 - tol) continue;
 
                 double cx = (w.X1 + w.X2) / 2.0;
                 if (cx < a - tol || cx > b + tol) continue;
 
-                return true;
+                struck[i] = true;
+                hit = true;
             }
 
-            return false;
+            return hit;
         }
 
         // ── 单元格枚举 ────────────────────────────────────────────────────────
@@ -478,8 +580,11 @@ namespace CadPartSplitter
         /// <summary>
         /// 一个候选单元格：由上下两条横线 + 左右两条竖线围出的最小闭合金框。
         /// 坐标为 PDF 单位（pt，Y 向上，左边 X1 &lt; X2，下边 Y1 &lt; Y2）。
+        ///
+        /// internal 而不是 private：探针（_test\CsvProbe）要直接断言「文字笔画假格子不能挤掉真格子」
+        /// 这条流水线，免得照抄一份逻辑去测。
         /// </summary>
-        private class Cell
+        internal class Cell
         {
             public double X1;
             public double X2;
@@ -488,6 +593,9 @@ namespace CadPartSplitter
 
             public string Text = string.Empty;
             public int WordCount;
+
+            /// <summary>这一格里被划线（取り消し線）划掉的词数。</summary>
+            public int StruckWords;
         }
 
         private static double CellArea(Cell c)
@@ -596,10 +704,42 @@ namespace CadPartSplitter
         // ── 单元格归组（相邻 → 同一张表）──────────────────────────────────────
 
         /// <summary>
+        /// 剔掉「拼不成表的孤立矩形」。
+        ///
+        /// 文字轮廓（「図」「要」这类笔画多的字）偶尔会凑出四条边，被 <see cref="FindCells"/> 当成一个候选格子。
+        /// 它本身不会变成表（一张表至少要 <see cref="MinTableCells"/> 格），但如果留着，下一步
+        /// <see cref="RemoveContainers"/> 会把包住它的<b>真格子</b>当成「套娃」删掉 —— 真格子一没，
+        /// 落在里面的一整段文字就再没有归属，只能整段丢掉（H310U10004 表題欄 F 行的
+        /// 「枠 ブレーキ部品取付/調整ラベル・注意ラベル貼付要領図」就是这样丢的）。
+        ///
+        /// 判据：与其余任何候选都不共边相邻 → 不属于任何一张表 → 不是格子。
+        /// </summary>
+        /// <returns>剔掉的候选数。</returns>
+        internal static int DropIsolatedCells(List<Cell> cells, double tol)
+        {
+            if (cells.Count < 2) return 0;
+
+            List<List<Cell>> groups = GroupCells(cells, tol);
+
+            var keep = new List<Cell>(cells.Count);
+
+            foreach (var g in groups)
+                if (g.Count >= MinTableCells)
+                    keep.AddRange(g);
+
+            int dropped = cells.Count - keep.Count;
+            if (dropped <= 0) return 0;
+
+            cells.Clear();
+            cells.AddRange(keep);
+            return dropped;
+        }
+
+        /// <summary>
         /// 删掉「包住别的候选矩形」的候选：合法单元格是按最小闭合矩形枚举出来的，不会套娃；
         /// 出现在这里说明是边界不整齐（两条表相邻、缺线）拼出来的大矩形，属于误判。
         /// </summary>
-        private static void RemoveContainers(List<Cell> cells, double tol)
+        internal static void RemoveContainers(List<Cell> cells, double tol)
         {
             if (cells.Count < 2) return;
 
@@ -767,7 +907,8 @@ namespace CadPartSplitter
                     Row = rows - top + 1,   // by 按 y 升序，top 的下标越大越靠上
                     RowSpan = top - bottom,
                     Text = (c.Text ?? string.Empty).Trim(),
-                    WordCount = c.WordCount
+                    WordCount = c.WordCount,
+                    StruckWordCount = c.StruckWords
                 };
 
                 SetPixelRect(cell, c.X1, c.X2, c.Y1, c.Y2, pageH, scaleX, scaleY, mmPerPx);
@@ -789,6 +930,12 @@ namespace CadPartSplitter
                 }
                 row.Cells.Add(cell);
             }
+
+            // 「整行划掉」= 作废行：行内只要有格子被划线就算（CAD 图里划线是整行画的，
+            // 各列文字高低不同，可能只有中间几列的字被线穿过）
+            foreach (var row in table.Rows)
+                foreach (var cell in row.Cells)
+                    if (cell.IsStruck) { row.IsStruck = true; break; }
 
             table.Rows.Sort((a, b) => a.Index.CompareTo(b.Index));
             FillRects(table, mmPerPx);
@@ -900,8 +1047,8 @@ namespace CadPartSplitter
 
         // ── 文字填料 ──────────────────────────────────────────────────────────
 
-        /// <summary>文字层里的一个词（PDF 单位坐标 + 页面像素坐标）。</summary>
-        private class WordBox
+        /// <summary>文字层里的一个词（PDF 单位坐标 + 页面像素坐标）。internal 供探针构造测试用。</summary>
+        internal class WordBox
         {
             public string Text;
             public double X1;   // 左
@@ -939,11 +1086,13 @@ namespace CadPartSplitter
         /// <summary>
         /// 把尚未归属的词填进单元格：词中心落在格子内（四条边框之内）就归该格。
         /// 完全不看文字间距，因此空单元格不会错位、合并单元格也不会被拆开。
+        /// 被划线（取り消し線）划掉的词数一并记下 —— 上层据此判定「整行作废」。
         /// </summary>
         /// <returns>填进去的词数。</returns>
-        private static int FillCell(Cell cell, List<WordBox> words, bool[] used)
+        private static int FillCell(Cell cell, List<WordBox> words, bool[] used, bool[] struck)
         {
             List<WordBox> picked = null;
+            int struckCount = 0;
 
             for (int i = 0; i < words.Count; i++)
             {
@@ -959,20 +1108,27 @@ namespace CadPartSplitter
                 used[i] = true;
                 if (picked == null) picked = new List<WordBox>();
                 picked.Add(w);
+
+                if (struck != null && i < struck.Length && struck[i]) struckCount++;
             }
 
             if (picked == null) return 0;
 
             cell.Text = ComposeText(picked);
             cell.WordCount = picked.Count;
+            cell.StruckWords = struckCount;
             return picked.Count;
         }
 
         /// <summary>
         /// 把一格内的词拼成文字：先按行（y 中心相近）分组、行内按 x 排序，
-        /// 词间距明显（大于字高 1/4）时补一个空格，换行也补一个空格。
+        /// 词间距明显（一般大于字高 1/4）时补一个空格，换行也补一个空格。
+        ///
+        /// 空格判据为什么要两套：CAD 里常见「压扁排字」的长标签（字高不变、字宽只有一半），
+        /// 按字高判会把本该有的空格吃掉 —— H310U10004 表題欄 F 行就是「枠 ブレーキ部品…」
+        /// 被拼成「枠ブレーキ部品…」。所以再按本格的平均字宽取一次比例，两者取小（并留字高 1/8 的下限）。
         /// </summary>
-        private static string ComposeText(List<WordBox> words)
+        internal static string ComposeText(List<WordBox> words)
         {
             var ordered = new List<WordBox>(words);
 
@@ -988,6 +1144,21 @@ namespace CadPartSplitter
                 return a.X1.CompareTo(b.X1);
             });
 
+            // 本格的平均字宽（字身宽 / 字数，按格内全部词统计）
+            double sumWidth = 0;
+            int sumChars = 0;
+
+            foreach (var w in ordered)
+            {
+                int n = w.Text == null ? 0 : w.Text.Length;
+                if (n <= 0) continue;
+
+                sumWidth += w.X2 - w.X1;
+                sumChars += n;
+            }
+
+            double avgAdv = sumChars > 0 ? sumWidth / sumChars : 0;
+
             var sb = new StringBuilder();
             double prevRight = 0;
             double prevCenter = 0;
@@ -997,9 +1168,15 @@ namespace CadPartSplitter
             {
                 double cy = (w.Y1 + w.Y2) / 2.0;
                 double h = Math.Max(w.Y2 - w.Y1, 1.0);
+
+                double spaceGap = h * 0.25;
+
+                if (avgAdv > 0)
+                    spaceGap = Math.Min(spaceGap, Math.Max(avgAdv * 0.30, h * 0.125));
+
                 bool sameLine = hasPrev && Math.Abs(cy - prevCenter) <= h * 0.5;
 
-                if (hasPrev && (!sameLine || w.X1 - prevRight > h * 0.25))
+                if (hasPrev && (!sameLine || w.X1 - prevRight > spaceGap))
                     sb.Append(' ');
 
                 sb.Append(w.Text);

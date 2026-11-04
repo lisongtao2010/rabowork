@@ -33,6 +33,9 @@ namespace CadPartSplitter
         /// <summary>当前输入文件为 PDF 时记录其总页数；非 PDF 为 0。</summary>
         private int _pdfPageCount;
 
+        /// <summary>上次打开的「图面分类清单」路径：重开窗口时优先用它（手工挑过的位置比推算值更可信）。</summary>
+        private string _lastPdfInfoListPath;
+
         public MainForm()
         {
             InitializeComponent();
@@ -53,6 +56,7 @@ namespace CadPartSplitter
             btnBrowseOutput.Click    += btnBrowseOutput_Click;
             btnStart.Click           += btnStart_Click;
             btnOpenOutput.Click      += btnOpenOutput_Click;
+            btnPdfInfo.Click         += btnPdfInfo_Click;
             FormClosing              += MainForm_FormClosing;
             Shown                    += MainForm_Shown;
             DragEnter                += MainForm_DragEnter;
@@ -868,6 +872,70 @@ namespace CadPartSplitter
             }
         }
 
+        // ── 图面分类清单维护 ──────────────────────────────────────────────────
+
+        /// <summary>
+        /// 打开「PDF 信息清单」维护窗口：清单是整批一份的
+        /// <c>&lt;输出根目录&gt;\classify\PdfInfoList.txt</c>。
+        ///
+        /// 图面分类是自动判出来的（在 <c>tables\*.csv</c> 里找「図番号前 4 位 + 图种关键字」），
+        /// 表題欄写得不规范、或者在图纸上根本看不出来时这一列就会空着 —— 空着会让
+        /// <c>01_アッセンブリ図_部品機能情報.csv</c> / <c>01_アッセンブリ図_要領図.csv</c> /
+        /// <c>02_要領図_部品機能情報.csv</c> 这些「只对特定图种才生成」的产物落不了盘。
+        /// 在这里把「图面分类」补上 / 改正，下一次分割就直接按它来（手工设定的行不会被自动判定覆盖）。
+        /// </summary>
+        private void btnPdfInfo_Click(object sender, EventArgs e)
+        {
+            string input     = NormalizePath(txtInput.Text);
+            string outputDir = NormalizePath(txtOutput.Text);
+
+            if (string.IsNullOrEmpty(outputDir))
+            {
+                MessageBox.Show(this,
+                    "请先选择图纸或文件夹 —— 输出目录有值之后才知道分类清单落在哪里" + Environment.NewLine
+                    + "（清单在 <输出根目录>\\classify\\PdfInfoList.txt）。",
+                    "提示", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            // 单张图纸：按図番号判断「输出目录」是不是已经带图纸名的子目录；批量 / 文件夹给空串
+            string drawingNumber = File.Exists(input) ? Path.GetFileNameWithoutExtension(input) : string.Empty;
+            string listPath;
+
+            try
+            {
+                listPath = PdfInfoListBuilder.GetListPath(outputDir, drawingNumber);
+            }
+            catch (Exception ex)
+            {
+                ShowInputError("定位分类清单", ex);
+                return;
+            }
+
+            if (string.IsNullOrEmpty(listPath))
+            {
+                MessageBox.Show(this, "无法由输出目录推导分类清单的位置，请检查输出目录是否为空 / 是否含非法字符。",
+                                "提示", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            // 推算出来的清单还不存在时，退回上次手工挑过的那个（同一批图纸换了输出目录时才走推算值）
+            if (!File.Exists(listPath)
+                && !string.IsNullOrEmpty(_lastPdfInfoListPath)
+                && File.Exists(_lastPdfInfoListPath))
+            {
+                listPath = _lastPdfInfoListPath;
+            }
+
+            using (var form = new PdfInfoEditorForm(listPath))
+            {
+                form.ShowDialog(this);
+                _lastPdfInfoListPath = form.ListPath;
+            }
+
+            AppendLog($"[INFO] 图面分类清单：{listPath}（自动判定判不出来的行，可在该窗口手工设定图面分类）");
+        }
+
         // ── 界面状态辅助 ──────────────────────────────────────────────────────
 
         /// <summary>切换“处理中 / 空闲”界面状态。</summary>
@@ -878,6 +946,7 @@ namespace CadPartSplitter
             btnBrowseFolder.Enabled = !busy;
             btnBrowseOutput.Enabled = !busy;
             btnOpenOutput.Enabled   = !busy;
+            btnPdfInfo.Enabled      = !busy;
             grpOptions.Enabled      = !busy;
             progressBar.Visible     = busy;
             Cursor                  = busy ? Cursors.WaitCursor : Cursors.Default;

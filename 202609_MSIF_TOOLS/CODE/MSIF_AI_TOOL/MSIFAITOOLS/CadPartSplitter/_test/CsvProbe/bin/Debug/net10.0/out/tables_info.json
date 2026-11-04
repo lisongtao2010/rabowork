@@ -7,13 +7,16 @@
       "name": "table_01",
       "pixel": { "x": 0, "y": 0, "w": 0, "h": 0 },
       "pdf_mm": { "x": 0.00, "y": 0.00, "w": 0.00, "h": 0.00 },
-      "row_count": 2,
-      "column_count": 3,
+      "row_count": 4,
+      "column_count": 2,
       "cell_count": 6,
       "text_cell_count": 6,
+      "struck_row_count": 1,
+      "visible_row_count": 3,
       "rows": [
         {
           "index": 1,
+          "struck": false,
           "pixel": { "x": 0, "y": 0, "w": 0, "h": 0 },
           "cells": [
             {
@@ -21,8 +24,9 @@
               "column": 1,
               "row_span": 1,
               "column_span": 1,
-              "text": "番号",
+              "text": "項目",
               "word_count": 1,
+              "struck_words": 0,
               "pixel": { "x": 0, "y": 0, "w": 0, "h": 0 },
               "pdf_mm": { "x": 0.00, "y": 0.00, "w": 0.00, "h": 0.00 }
             },
@@ -31,18 +35,9 @@
               "column": 2,
               "row_span": 1,
               "column_span": 1,
-              "text": "部品名",
+              "text": "図番",
               "word_count": 1,
-              "pixel": { "x": 0, "y": 0, "w": 0, "h": 0 },
-              "pdf_mm": { "x": 0.00, "y": 0.00, "w": 0.00, "h": 0.00 }
-            },
-            {
-              "row": 1,
-              "column": 3,
-              "row_span": 1,
-              "column_span": 1,
-              "text": "部品コード",
-              "word_count": 1,
+              "struck_words": 0,
               "pixel": { "x": 0, "y": 0, "w": 0, "h": 0 },
               "pdf_mm": { "x": 0.00, "y": 0.00, "w": 0.00, "h": 0.00 }
             }
@@ -50,6 +45,7 @@
         },
         {
           "index": 2,
+          "struck": true,
           "pixel": { "x": 0, "y": 0, "w": 0, "h": 0 },
           "cells": [
             {
@@ -57,8 +53,9 @@
               "column": 1,
               "row_span": 1,
               "column_span": 1,
-              "text": "1",
+              "text": "D",
               "word_count": 1,
+              "struck_words": 1,
               "pixel": { "x": 0, "y": 0, "w": 0, "h": 0 },
               "pdf_mm": { "x": 0.00, "y": 0.00, "w": 0.00, "h": 0.00 }
             },
@@ -67,18 +64,38 @@
               "column": 2,
               "row_span": 1,
               "column_span": 1,
-              "text": "部品セット\r\n三方枠",
-              "word_count": 2,
+              "text": "H310U10025",
+              "word_count": 1,
+              "struck_words": 1,
+              "pixel": { "x": 0, "y": 0, "w": 0, "h": 0 },
+              "pdf_mm": { "x": 0.00, "y": 0.00, "w": 0.00, "h": 0.00 }
+            }
+          ]
+        },
+        {
+          "index": 4,
+          "struck": false,
+          "pixel": { "x": 0, "y": 0, "w": 0, "h": 0 },
+          "cells": [
+            {
+              "row": 4,
+              "column": 1,
+              "row_span": 1,
+              "column_span": 1,
+              "text": "G",
+              "word_count": 1,
+              "struck_words": 0,
               "pixel": { "x": 0, "y": 0, "w": 0, "h": 0 },
               "pdf_mm": { "x": 0.00, "y": 0.00, "w": 0.00, "h": 0.00 }
             },
             {
-              "row": 2,
-              "column": 3,
+              "row": 4,
+              "column": 2,
               "row_span": 1,
               "column_span": 1,
-              "text": "MZA968,\"特注\"",
+              "text": "H310U10028",
               "word_count": 1,
+              "struck_words": 0,
               "pixel": { "x": 0, "y": 0, "w": 0, "h": 0 },
               "pdf_mm": { "x": 0.00, "y": 0.00, "w": 0.00, "h": 0.00 }
             }

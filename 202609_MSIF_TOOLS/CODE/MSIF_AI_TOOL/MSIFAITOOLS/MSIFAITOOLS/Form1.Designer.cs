@@ -49,7 +49,6 @@ namespace MSIFAITOOLS
             this.cmsClassify = new System.Windows.Forms.ContextMenuStrip(this.components);
             this.mnuShowPartInfo = new System.Windows.Forms.ToolStripMenuItem();
             this.mnuPreviewPdf = new System.Windows.Forms.ToolStripMenuItem();
-            this.btnSaveClassify = new System.Windows.Forms.Button();
             this.chkAutoPreview = new System.Windows.Forms.CheckBox();
             this.chkCadSplit = new System.Windows.Forms.CheckBox();
             this.grpAction = new System.Windows.Forms.GroupBox();
@@ -414,7 +413,6 @@ namespace MSIFAITOOLS
             this.pnlClassifyBar.Controls.Add(this.btnPartInfo);
             this.pnlClassifyBar.Controls.Add(this.btnOpenClassifyDir);
             this.pnlClassifyBar.Controls.Add(this.btnPreviewPdf);
-            this.pnlClassifyBar.Controls.Add(this.btnSaveClassify);
             this.pnlClassifyBar.Dock = System.Windows.Forms.DockStyle.Bottom;
             this.pnlClassifyBar.Location = new System.Drawing.Point(3, 243);
             this.pnlClassifyBar.Name = "pnlClassifyBar";
@@ -485,24 +483,6 @@ namespace MSIFAITOOLS
             this.chkAutoPreview.UseVisualStyleBackColor = true;
             this.chkAutoPreview.CheckedChanged += new System.EventHandler(this.ChkAutoPreview_CheckedChanged);
             //
-            // btnSaveClassify
-            //
-            this.btnSaveClassify.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
-            this.btnSaveClassify.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(232)))), ((int)(((byte)(237)))), ((int)(((byte)(243)))));
-            this.btnSaveClassify.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.btnSaveClassify.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(199)))), ((int)(((byte)(208)))), ((int)(((byte)(219)))));
-            this.btnSaveClassify.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(217)))), ((int)(((byte)(226)))), ((int)(((byte)(236)))));
-            this.btnSaveClassify.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnSaveClassify.Font = new System.Drawing.Font("微软雅黑", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
-            this.btnSaveClassify.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(52)))), ((int)(((byte)(73)))), ((int)(((byte)(94)))));
-            this.btnSaveClassify.Location = new System.Drawing.Point(600, 8);
-            this.btnSaveClassify.Name = "btnSaveClassify";
-            this.btnSaveClassify.Size = new System.Drawing.Size(110, 28);
-            this.btnSaveClassify.TabIndex = 2;
-            this.btnSaveClassify.Text = "保存分类结果";
-            this.btnSaveClassify.UseVisualStyleBackColor = false;
-            this.btnSaveClassify.Click += new System.EventHandler(this.BtnSaveClassify_Click);
-            //
             // btnOpenClassifyDir
             //
             this.btnOpenClassifyDir.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
@@ -513,7 +493,7 @@ namespace MSIFAITOOLS
             this.btnOpenClassifyDir.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.btnOpenClassifyDir.Font = new System.Drawing.Font("微软雅黑", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
             this.btnOpenClassifyDir.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(52)))), ((int)(((byte)(73)))), ((int)(((byte)(94)))));
-            this.btnOpenClassifyDir.Location = new System.Drawing.Point(714, 8);
+            this.btnOpenClassifyDir.Location = new System.Drawing.Point(600, 8);
             this.btnOpenClassifyDir.Name = "btnOpenClassifyDir";
             this.btnOpenClassifyDir.Size = new System.Drawing.Size(110, 28);
             this.btnOpenClassifyDir.TabIndex = 3;
@@ -562,7 +542,6 @@ namespace MSIFAITOOLS
             this.dgvClassify.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
             this.dgvClassify.Size = new System.Drawing.Size(840, 240);
             this.dgvClassify.TabIndex = 0;
-            this.dgvClassify.CellValueChanged += new System.Windows.Forms.DataGridViewCellEventHandler(this.DgvClassify_CellValueChanged);
             this.dgvClassify.ContextMenuStrip = this.cmsClassify;
             this.dgvClassify.KeyDown += new System.Windows.Forms.KeyEventHandler(this.DgvClassify_KeyDown);
             this.dgvClassify.CellDoubleClick += new System.Windows.Forms.DataGridViewCellEventHandler(this.DgvClassify_CellDoubleClick);
@@ -700,7 +679,6 @@ namespace MSIFAITOOLS
         private System.Windows.Forms.ContextMenuStrip cmsClassify;
         private System.Windows.Forms.ToolStripMenuItem mnuShowPartInfo;
         private System.Windows.Forms.ToolStripMenuItem mnuPreviewPdf;
-        private System.Windows.Forms.Button btnSaveClassify;
         private System.Windows.Forms.CheckBox chkAutoPreview;
         private System.Windows.Forms.StatusStrip statusStrip;
         private System.Windows.Forms.ToolStripStatusLabel lblStatus;

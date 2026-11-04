@@ -13,3 +13,12 @@ D:\Github_lis2010\rabowork\202609_MSIF_TOOLS\CODE\MSIF_AI_TOOL\MSIFAITOOLS\CadPa
 D:\Github_lis2010\rabowork\202609_MSIF_TOOLS\CODE\MSIF_AI_TOOL\MSIFAITOOLS\CadPartSplitter\_test\CsvProbe\obj\Debug\net10.0\CsvProbe.pdb
 D:\Github_lis2010\rabowork\202609_MSIF_TOOLS\CODE\MSIF_AI_TOOL\MSIFAITOOLS\CadPartSplitter\_test\CsvProbe\obj\Debug\net10.0\CsvProbe.genruntimeconfig.cache
 D:\Github_lis2010\rabowork\202609_MSIF_TOOLS\CODE\MSIF_AI_TOOL\MSIFAITOOLS\CadPartSplitter\_test\CsvProbe\obj\Debug\net10.0\ref\CsvProbe.dll
+D:\Github_lis2010\rabowork\202609_MSIF_TOOLS\CODE\MSIF_AI_TOOL\MSIFAITOOLS\CadPartSplitter\_test\CsvProbe\bin\Debug\net10.0\UglyToad.PdfPig.Core.dll
+D:\Github_lis2010\rabowork\202609_MSIF_TOOLS\CODE\MSIF_AI_TOOL\MSIFAITOOLS\CadPartSplitter\_test\CsvProbe\bin\Debug\net10.0\UglyToad.PdfPig.DocumentLayoutAnalysis.dll
+D:\Github_lis2010\rabowork\202609_MSIF_TOOLS\CODE\MSIF_AI_TOOL\MSIFAITOOLS\CadPartSplitter\_test\CsvProbe\bin\Debug\net10.0\UglyToad.PdfPig.Fonts.dll
+D:\Github_lis2010\rabowork\202609_MSIF_TOOLS\CODE\MSIF_AI_TOOL\MSIFAITOOLS\CadPartSplitter\_test\CsvProbe\bin\Debug\net10.0\UglyToad.PdfPig.Package.dll
+D:\Github_lis2010\rabowork\202609_MSIF_TOOLS\CODE\MSIF_AI_TOOL\MSIFAITOOLS\CadPartSplitter\_test\CsvProbe\bin\Debug\net10.0\UglyToad.PdfPig.Tokenization.dll
+D:\Github_lis2010\rabowork\202609_MSIF_TOOLS\CODE\MSIF_AI_TOOL\MSIFAITOOLS\CadPartSplitter\_test\CsvProbe\bin\Debug\net10.0\UglyToad.PdfPig.Tokens.dll
+D:\Github_lis2010\rabowork\202609_MSIF_TOOLS\CODE\MSIF_AI_TOOL\MSIFAITOOLS\CadPartSplitter\_test\CsvProbe\bin\Debug\net10.0\UglyToad.PdfPig.dll
+D:\Github_lis2010\rabowork\202609_MSIF_TOOLS\CODE\MSIF_AI_TOOL\MSIFAITOOLS\CadPartSplitter\_test\CsvProbe\obj\Debug\net10.0\CsvProbe.csproj.AssemblyReference.cache
+D:\Github_lis2010\rabowork\202609_MSIF_TOOLS\CODE\MSIF_AI_TOOL\MSIFAITOOLS\CadPartSplitter\_test\CsvProbe\obj\Debug\net10.0\CsvProbe.csproj.Up2Date

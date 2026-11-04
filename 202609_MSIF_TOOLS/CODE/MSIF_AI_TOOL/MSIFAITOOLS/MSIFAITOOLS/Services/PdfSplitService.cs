@@ -109,8 +109,10 @@ namespace MSIFAITOOLS.Services
     ///      （plu_text / plu_layout / plu_table / plu_image / plu_all）；
     ///      其中 plu_image 为“图上文字”：按图片区域与文字坐标比对判定，表格文字不重复计入
     ///      （表格文字按“表格块外接矩形 + 有效 X 范围”判定，与表格左右并排的图纸标注仍算图上文字）；
-    ///   4) &lt;文件夹&gt;\AiAppData\classify\classification.csv —— 每个 PDF 的分类结果
-    ///      （基本図 / 加工図 / アッセンブリ図 / 要領図 / 未知）。
+    ///   4) &lt;文件夹&gt;\AiAppData\classify\PdfInfoList.txt —— 每个 PDF 的分类结果
+    ///      （基本図 / 加工図 / アッセンブリ図 / 要領図 / 未知），由外部（CadPartSplitter 等）生成，
+    ///      本工具只读取（図番号,文件名,图面分类,分类依据 四列）；
+    ///      主清单里没有的 PDF 再读该图自己的 &lt;図番号&gt;\PdfInfoList.txt，两处都没有则为未知。
     /// </summary>
     internal sealed class PdfSplitService
     {
@@ -320,7 +322,7 @@ namespace MSIFAITOOLS.Services
             ReportLog(onLog, LogKind.Info, "输出根目录：" + outputRoot);
             ReportLog(onLog, LogKind.Info,
                 string.Format("每个 PDF 输出到：{0}{1}<図番号>{1}", outputRoot, Path.DirectorySeparatorChar));
-            ReportLog(onLog, LogKind.Info, "分类结果目录：" + classifyDirectory);
+            ReportLog(onLog, LogKind.Info, "分类清单目录：" + classifyDirectory);
 
             List<string> errors = new List<string>();
             int total = pdfNames.Length;
@@ -409,31 +411,36 @@ namespace MSIFAITOOLS.Services
                 ReportLog(onLog, LogKind.Success, string.Format("SUCCESS {0}/{1}", succeeded, total));
             }
 
-            // 分解完成后按図番号规则分类（分类失败不影响分解结果）
+            // 分解完成后读分类清单：<输出根目录>\classify\PdfInfoList.txt
+            // （由外部工具生成，本工具只读；读不到时全部记为未知，不影响分解结果）
             IList<PdfClassification> classifications =
-                ClassifyAll(folder, pdfNames, outputRoot, classifyDirectory, onLog);
+                LoadClassifications(folder, pdfNames, outputRoot, onLog);
 
             return new PdfSplitResult(total, succeeded, errors, outputRoot, classifyDirectory,
                 classifications);
         }
 
-        /// <summary>对本次处理的 PDF 分类，写出汇总 CSV，并把每项结果写入日志。</summary>
-        private static IList<PdfClassification> ClassifyAll(string folder, string[] pdfNames, string outputRoot,
-            string classifyDirectory, Action<LogKind, string> onLog)
+        /// <summary>读取分类清单（classify\PdfInfoList.txt），并把每项结果写入日志。</summary>
+        private static IList<PdfClassification> LoadClassifications(string folder, string[] pdfNames,
+            string outputRoot, Action<LogKind, string> onLog)
         {
             IList<PdfClassification> items;
 
             try
             {
-                items = PdfClassifier.ClassifyFiles(folder, pdfNames, outputRoot);
+                items = PdfClassifier.LoadInfoList(folder, pdfNames, outputRoot);
             }
             catch (Exception ex)
             {
-                ReportLog(onLog, LogKind.Error, "分类失败：" + ex.Message);
+                ReportLog(onLog, LogKind.Error, "读取分类清单失败：" + ex.Message);
                 return new List<PdfClassification>();
             }
 
+            string infoListPath = PdfClassifier.GetInfoListPath(outputRoot);
+
             ReportLog(onLog, LogKind.Info, "--------------------------------------------------");
+            ReportLog(onLog, LogKind.Info,
+                "分类清单：" + infoListPath + (File.Exists(infoListPath) ? string.Empty : "（不存在）"));
             ReportLog(onLog, LogKind.Info, "分类结果：" + PdfClassifier.BuildSummaryText(items));
 
             foreach (PdfClassification item in items)
@@ -443,18 +450,8 @@ namespace MSIFAITOOLS.Services
                 ReportLog(onLog, needChoice ? LogKind.Warning : LogKind.Info,
                     string.Format("  {0} → {1}{2}（{3}）",
                         item.FileName, item.CategoryName,
-                        needChoice ? "，需在画面上选择" : string.Empty,
+                        needChoice ? "，分类清单里没有记录" : string.Empty,
                         item.Evidence));
-            }
-
-            try
-            {
-                string summaryPath = PdfClassifier.SaveSummary(classifyDirectory, items);
-                ReportLog(onLog, LogKind.Info, "分类汇总已保存：" + summaryPath);
-            }
-            catch (Exception ex)
-            {
-                ReportLog(onLog, LogKind.Warning, "分类汇总保存失败：" + ex.Message);
             }
 
             return items;

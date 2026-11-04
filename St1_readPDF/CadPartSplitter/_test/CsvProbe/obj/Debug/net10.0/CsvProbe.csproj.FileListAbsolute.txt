@@ -1,0 +1,15 @@
+D:\Github_lis2010\rabowork\202609_MSIF_TOOLS\CODE\MSIF_AI_TOOL\St1_readPDF\CadPartSplitter\_test\CsvProbe\bin\Debug\net10.0\CsvProbe.exe
+D:\Github_lis2010\rabowork\202609_MSIF_TOOLS\CODE\MSIF_AI_TOOL\St1_readPDF\CadPartSplitter\_test\CsvProbe\bin\Debug\net10.0\CsvProbe.deps.json
+D:\Github_lis2010\rabowork\202609_MSIF_TOOLS\CODE\MSIF_AI_TOOL\St1_readPDF\CadPartSplitter\_test\CsvProbe\bin\Debug\net10.0\CsvProbe.runtimeconfig.json
+D:\Github_lis2010\rabowork\202609_MSIF_TOOLS\CODE\MSIF_AI_TOOL\St1_readPDF\CadPartSplitter\_test\CsvProbe\bin\Debug\net10.0\CsvProbe.dll
+D:\Github_lis2010\rabowork\202609_MSIF_TOOLS\CODE\MSIF_AI_TOOL\St1_readPDF\CadPartSplitter\_test\CsvProbe\bin\Debug\net10.0\CsvProbe.pdb
+D:\Github_lis2010\rabowork\202609_MSIF_TOOLS\CODE\MSIF_AI_TOOL\St1_readPDF\CadPartSplitter\_test\CsvProbe\obj\Debug\net10.0\CsvProbe.GeneratedMSBuildEditorConfig.editorconfig
+D:\Github_lis2010\rabowork\202609_MSIF_TOOLS\CODE\MSIF_AI_TOOL\St1_readPDF\CadPartSplitter\_test\CsvProbe\obj\Debug\net10.0\CsvProbe.AssemblyInfoInputs.cache
+D:\Github_lis2010\rabowork\202609_MSIF_TOOLS\CODE\MSIF_AI_TOOL\St1_readPDF\CadPartSplitter\_test\CsvProbe\obj\Debug\net10.0\CsvProbe.AssemblyInfo.cs
+D:\Github_lis2010\rabowork\202609_MSIF_TOOLS\CODE\MSIF_AI_TOOL\St1_readPDF\CadPartSplitter\_test\CsvProbe\obj\Debug\net10.0\CsvProbe.csproj.CoreCompileInputs.cache
+D:\Github_lis2010\rabowork\202609_MSIF_TOOLS\CODE\MSIF_AI_TOOL\St1_readPDF\CadPartSplitter\_test\CsvProbe\obj\Debug\net10.0\CsvProbe.sourcelink.json
+D:\Github_lis2010\rabowork\202609_MSIF_TOOLS\CODE\MSIF_AI_TOOL\St1_readPDF\CadPartSplitter\_test\CsvProbe\obj\Debug\net10.0\CsvProbe.dll
+D:\Github_lis2010\rabowork\202609_MSIF_TOOLS\CODE\MSIF_AI_TOOL\St1_readPDF\CadPartSplitter\_test\CsvProbe\obj\Debug\net10.0\refint\CsvProbe.dll
+D:\Github_lis2010\rabowork\202609_MSIF_TOOLS\CODE\MSIF_AI_TOOL\St1_readPDF\CadPartSplitter\_test\CsvProbe\obj\Debug\net10.0\CsvProbe.pdb
+D:\Github_lis2010\rabowork\202609_MSIF_TOOLS\CODE\MSIF_AI_TOOL\St1_readPDF\CadPartSplitter\_test\CsvProbe\obj\Debug\net10.0\CsvProbe.genruntimeconfig.cache
+D:\Github_lis2010\rabowork\202609_MSIF_TOOLS\CODE\MSIF_AI_TOOL\St1_readPDF\CadPartSplitter\_test\CsvProbe\obj\Debug\net10.0\ref\CsvProbe.dll

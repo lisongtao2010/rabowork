@@ -6,7 +6,8 @@ namespace CadPartSplitter
 {
     /// <summary>
     /// 部品表「下表参照」展开：读 <c>tables\table_NN.csv</c>，把主表的这类行按参照表的明细拆开，
-    /// 输出下游 AI 环节约定的 <c>LT_STEP1.csv</c>。
+    /// 输出下游 AI 环节约定的 <c>01_アッセンブリ図_部品機能情報.csv</c>
+    /// （旧文件名 <c>LT_STEP1.csv</c>；开关仍是 <see cref="DetectorOptions.BuildLtStep1Table"/> / <c>--no-lt-step1</c>）。
     ///
     /// 规则（与图纸上的写法一一对应）：
     ///   · 主表 —— 表头（第一行）同时含「番号」「部品名」「部品コード」，它的明细就是输出内容；
@@ -16,12 +17,27 @@ namespace CadPartSplitter
     ///   · 参照表找不到 / 明细全空 → 该行原样保留并写 WARN，不做猜测。
     ///
     /// 编码与其它清单一致：CSV 用带 BOM 的 UTF-8 + CRLF + RFC 4180 转义（Excel 双击即可打开）。
-    /// 只读 <c>tables\*.csv</c>，不改动任何已有产物。
+    /// 只读 <c>tables\*.csv</c>；除顺手删掉自己改名前的老文件 <c>LT_STEP1.csv</c> 外，不改动任何已有产物。
+    ///
+    /// **只有アッセンブリ図（組立図）才写这份清单**：图面分类读自分类清单 <c>classify\PdfInfoList.txt</c>
+    /// （<see cref="PdfInfoListBuilder"/> 在流水线里先跑一步生成；清单缺失 / 没有这张图时退回按
+    /// <c>tables\*.csv</c> 现判，同一套规则）。基本図 / 加工図 / 要領図 / 未识别 一律跳过，
+    /// 并删掉上一次运行可能留下的同名产物。
     /// </summary>
     public static class LtStep1Builder
     {
-        /// <summary>下游约定的文件名（写在输出目录根，与 tables_info.json 同级）。</summary>
-        public const string OutputFileName = "LT_STEP1.csv";
+        /// <summary>
+        /// 下游约定的文件名（写在输出目录根，与 tables_info.json 同级）。
+        /// 旧名是 <c>LT_STEP1.csv</c>，现按「图纸类别编号 + 日文名」统一成
+        /// <c>01_アッセンブリ図_部品機能情報.csv</c>（アッセンブリ図 = 組立図，部品機能情報 = 部品表）。
+        /// </summary>
+        public const string OutputFileName = "01_アッセンブリ図_部品機能情報.csv";
+
+        /// <summary>
+        /// 改名前的老文件名：同一输出目录里若还留着上一次运行写下的它，本次顺手清掉，
+        /// 免得下游按老名字取到过期内容。
+        /// </summary>
+        private const string LegacyOutputFileName = "LT_STEP1.csv";
 
         /// <summary>主表表头必须同时出现的三个词。</summary>
         private static readonly string[] PartsHeaders = { "番号", "部品名", "部品コード" };
@@ -33,7 +49,13 @@ namespace CadPartSplitter
         private const string NextTableKeyword = "下表参照";
 
         /// <summary>
-        /// 扫描 <paramref name="outputDirectory"/> 下的 <c>tables\*.csv</c> 并合成 <c>LT_STEP1.csv</c>。
+        /// 扫描 <paramref name="outputDirectory"/> 下的 <c>tables\*.csv</c> 并合成
+        /// <c>01_アッセンブリ図_部品機能情報.csv</c>。
+        ///
+        /// **只有アッセンブリ図（組立図）才写这份清单**：图面分类取自分类清单
+        /// <c>classify\PdfInfoList.txt</c>（<see cref="PdfInfoListBuilder"/> 在这之前刚生成），
+        /// 清单缺失时退回按 <c>tables\*.csv</c> 现判；分类不是アッセンブリ図就直接返回 0，
+        /// 并把上一次可能留下的同名产物清掉。
         /// </summary>
         /// <returns>写出的明细行数（不含表头）；0 表示没有生成文件。</returns>
         public static int Build(string outputDirectory, DetectorOptions opts)
@@ -42,18 +64,37 @@ namespace CadPartSplitter
 
             if (!o.BuildLtStep1Table)
             {
-                o.Log("[INFO] LT_STEP1 合成已关闭（BuildLtStep1Table = false）。");
+                o.Log("[INFO] 01_アッセンブリ図_部品機能情報 合成已关闭（BuildLtStep1Table = false）。");
                 return 0;
             }
 
             if (string.IsNullOrWhiteSpace(outputDirectory))
                 return 0;
 
+            // 只有アッセンブリ図（組立図）才需要这份「部品機能情報」清单：
+            // 先读分类清单 classify\PdfInfoList.txt（流水线刚写好的图面分类），清单缺失 / 没有这张图时
+            // 退回按 tables\*.csv 现判（与清单同一套规则）。判成别的图类就什么都不写。
+            string drawingNumber = PdfInfoListBuilder.DrawingNumberFromOutputDirectory(outputDirectory);
+            string categorySource;
+            string category = PdfInfoListBuilder.ResolveCategory(outputDirectory, drawingNumber, o, out categorySource);
+
+            if (!PdfInfoListBuilder.IsAssemblyCategory(category))
+            {
+                o.Log("[INFO] 01_アッセンブリ図_部品機能情報：图面分类「"
+                      + (string.IsNullOrEmpty(category) ? "未识别" : category) + "」（依据：" + categorySource
+                      + "）不是アッセンブリ図，跳过（并清掉旧的同名产物）。");
+
+                DeleteStaleOutput(outputDirectory, o);
+                return 0;
+            }
+
+            o.Log("[INFO] 01_アッセンブリ図_部品機能情報：图面分类「アッセンブリ図」（依据：" + categorySource + "），开始合成。");
+
             string csvDir = Path.Combine(outputDirectory, "tables");
 
             if (!Directory.Exists(csvDir))
             {
-                o.Log("[INFO] LT_STEP1：没有 tables 目录（本次未生成表格 CSV），跳过。");
+                o.Log("[INFO] 01_アッセンブリ図_部品機能情報：没有 tables 目录（本次未生成表格 CSV），跳过。");
                 return 0;
             }
 
@@ -66,7 +107,7 @@ namespace CadPartSplitter
 
             if (sheets.Count == 0)
             {
-                o.Log("[INFO] LT_STEP1：" + csvDir + " 下没有可读的表格 CSV，跳过。");
+                o.Log("[INFO] 01_アッセンブリ図_部品機能情報：" + csvDir + " 下没有可读的表格 CSV，跳过。");
                 return 0;
             }
 
@@ -123,7 +164,7 @@ namespace CadPartSplitter
 
                     if (refCodes == null)
                     {
-                        o.Log("[WARN] LT_STEP1：" + sheet.Name + " 第 " + (r + 1) + " 行「" + code
+                        o.Log("[WARN] 01_アッセンブリ図_部品機能情報：" + sheet.Name + " 第 " + (r + 1) + " 行「" + code
                               + "」找不到可用的参照表，该行原样保留。");
                         output.Add(MapToHeader(row, sheet.Header, outHeader));
                         continue;
@@ -140,7 +181,7 @@ namespace CadPartSplitter
                         expandedRows++;
                     }
 
-                    o.Log("[INFO] LT_STEP1：" + sheet.Name + " 第 " + (r + 1) + " 行（" + code + "）→ "
+                    o.Log("[INFO] 01_アッセンブリ図_部品機能情報：" + sheet.Name + " 第 " + (r + 1) + " 行（" + code + "）→ "
                           + refName + " 的 " + refCodes.Count + " 条部品コード："
                           + string.Join(" / ", refCodes.ToArray()));
                 }
@@ -148,18 +189,66 @@ namespace CadPartSplitter
 
             if (outHeader == null)
             {
-                o.Log("[INFO] LT_STEP1：未找到表头含「番号 / 部品名 / 部品コード」的表格，不生成 "
+                o.Log("[INFO] 01_アッセンブリ図_部品機能情報：未找到表头含「番号 / 部品名 / 部品コード」的表格，不生成 "
                       + OutputFileName + "。");
                 return 0;
             }
 
             string path = Path.Combine(outputDirectory, OutputFileName);
+
+            DeleteLegacyOutput(outputDirectory, o);
+
             CsvFile.Write(path, outHeader, output);
 
-            o.Log("[INFO] LT_STEP1：" + mainSheets + " 张主表 → 展开 " + expandedRows + " 行 → 共 "
+            o.Log("[INFO] 01_アッセンブリ図_部品機能情報：" + mainSheets + " 张主表 → 展开 " + expandedRows + " 行 → 共 "
                   + output.Count + " 条明细，已保存：" + path);
 
             return output.Count;
+        }
+
+        /// <summary>
+        /// 清掉上一次运行留下的旧文件名（改名前的 <c>LT_STEP1.csv</c>）。
+        /// 删不掉（被 Excel 打开 / 无权限）只记 WARN，不影响本次输出。
+        /// </summary>
+        private static void DeleteLegacyOutput(string outputDirectory, DetectorOptions o)
+        {
+            RemoveIfExists(Path.Combine(outputDirectory, LegacyOutputFileName), "旧文件名残留 ", o);
+        }
+
+        /// <summary>
+        /// 这张图不是アッセンブリ図时，把上一次运行留下的同名产物清掉
+        /// （上次可能判成アッセンブリ図，留着会让下游按固定名字取到过期内容）。
+        /// </summary>
+        private static void DeleteStaleOutput(string outputDirectory, DetectorOptions o)
+        {
+            RemoveIfExists(Path.Combine(outputDirectory, OutputFileName), string.Empty, o);
+            RemoveIfExists(Path.Combine(outputDirectory, LegacyOutputFileName), "旧文件名残留 ", o);
+        }
+
+        /// <summary>
+        /// 删一个文件；不存在就什么也不做。删不掉（被 Excel 占用 / 无权限）只记 WARN。
+        /// </summary>
+        /// <param name="path">要删的文件。</param>
+        /// <param name="note">日志里的说明（例如「旧文件名残留 」），可为空。</param>
+        /// <param name="o">参数 / 日志。</param>
+        private static void RemoveIfExists(string path, string note, DetectorOptions o)
+        {
+            if (!File.Exists(path))
+                return;
+
+            try
+            {
+                File.Delete(path);
+                o.Log("[INFO] 01_アッセンブリ図_部品機能情報：已删除" + note + path);
+            }
+            catch (IOException)
+            {
+                o.Log("[WARN] 01_アッセンブリ図_部品機能情報：删不掉" + note + path + "（可能正被 Excel 打开）。");
+            }
+            catch (UnauthorizedAccessException)
+            {
+                o.Log("[WARN] 01_アッセンブリ図_部品機能情報：删不掉" + note + path + "（无权限）。");
+            }
         }
 
         // ── CSV 读取 ─────────────────────────────────────────────────────────
