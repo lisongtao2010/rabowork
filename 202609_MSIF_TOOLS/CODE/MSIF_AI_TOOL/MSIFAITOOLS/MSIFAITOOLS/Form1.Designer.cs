@@ -58,6 +58,12 @@ namespace MSIFAITOOLS
             this.btnStart = new System.Windows.Forms.Button();
             this.btnAiAnalyze = new System.Windows.Forms.Button();
             this.btnCmdAnalyze = new System.Windows.Forms.Button();
+            this.lblCmdStepHint = new System.Windows.Forms.Label();
+            this.btnCmdStep1 = new System.Windows.Forms.Button();
+            this.btnCmdStep2 = new System.Windows.Forms.Button();
+            this.btnCmdStep3 = new System.Windows.Forms.Button();
+            this.btnCmdStep4 = new System.Windows.Forms.Button();
+            this.lblCmdStepNote = new System.Windows.Forms.Label();
             this.btnAiSettings = new System.Windows.Forms.Button();
             this.grpInput = new System.Windows.Forms.GroupBox();
             this.btnBrowse = new System.Windows.Forms.Button();
@@ -237,12 +243,18 @@ namespace MSIFAITOOLS
             this.grpAction.Controls.Add(this.btnStart);
             this.grpAction.Controls.Add(this.btnAiAnalyze);
             this.grpAction.Controls.Add(this.btnCmdAnalyze);
+            this.grpAction.Controls.Add(this.lblCmdStepHint);
+            this.grpAction.Controls.Add(this.btnCmdStep1);
+            this.grpAction.Controls.Add(this.btnCmdStep2);
+            this.grpAction.Controls.Add(this.btnCmdStep3);
+            this.grpAction.Controls.Add(this.btnCmdStep4);
+            this.grpAction.Controls.Add(this.lblCmdStepNote);
             this.grpAction.Controls.Add(this.btnAiSettings);
             this.grpAction.Font = new System.Drawing.Font("微软雅黑", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
             this.grpAction.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(52)))), ((int)(((byte)(73)))), ((int)(((byte)(94)))));
             this.grpAction.Location = new System.Drawing.Point(20, 126);
             this.grpAction.Name = "grpAction";
-            this.grpAction.Size = new System.Drawing.Size(860, 104);
+            this.grpAction.Size = new System.Drawing.Size(860, 148);
             this.grpAction.TabIndex = 1;
             this.grpAction.TabStop = false;
             this.grpAction.Text = "②  执行";
@@ -300,6 +312,98 @@ namespace MSIFAITOOLS
             this.btnCmdAnalyze.Text = "CMD 分析";
             this.btnCmdAnalyze.UseVisualStyleBackColor = false;
             this.btnCmdAnalyze.Click += new System.EventHandler(this.BtnCmdAnalyze_Click);
+            // 
+            // lblCmdStepHint
+            // 
+            this.lblCmdStepHint.AutoSize = false;
+            this.lblCmdStepHint.Font = new System.Drawing.Font("微软雅黑", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
+            this.lblCmdStepHint.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(108)))), ((int)(((byte)(117)))), ((int)(((byte)(125)))));
+            this.lblCmdStepHint.Location = new System.Drawing.Point(18, 90);
+            this.lblCmdStepHint.Name = "lblCmdStepHint";
+            this.lblCmdStepHint.Size = new System.Drawing.Size(78, 20);
+            this.lblCmdStepHint.TabIndex = 7;
+            this.lblCmdStepHint.Text = "分步执行：";
+            this.lblCmdStepHint.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+            // 
+            // btnCmdStep1
+            // 
+            this.btnCmdStep1.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(225)))), ((int)(((byte)(245)))), ((int)(((byte)(242)))));
+            this.btnCmdStep1.Cursor = System.Windows.Forms.Cursors.Hand;
+            this.btnCmdStep1.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(152)))), ((int)(((byte)(214)))), ((int)(((byte)(208)))));
+            this.btnCmdStep1.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(204)))), ((int)(((byte)(235)))), ((int)(((byte)(229)))));
+            this.btnCmdStep1.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnCmdStep1.Font = new System.Drawing.Font("微软雅黑", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
+            this.btnCmdStep1.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(105)))), ((int)(((byte)(92)))));
+            this.btnCmdStep1.Location = new System.Drawing.Point(100, 86);
+            this.btnCmdStep1.Name = "btnCmdStep1";
+            this.btnCmdStep1.Size = new System.Drawing.Size(176, 28);
+            this.btnCmdStep1.TabIndex = 8;
+            this.btnCmdStep1.Text = "第 1 步 · 装配图部品入库";
+            this.btnCmdStep1.UseVisualStyleBackColor = false;
+            this.btnCmdStep1.Click += new System.EventHandler(this.BtnCmdStep1_Click);
+            // 
+            // btnCmdStep2
+            // 
+            this.btnCmdStep2.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(225)))), ((int)(((byte)(245)))), ((int)(((byte)(242)))));
+            this.btnCmdStep2.Cursor = System.Windows.Forms.Cursors.Hand;
+            this.btnCmdStep2.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(152)))), ((int)(((byte)(214)))), ((int)(((byte)(208)))));
+            this.btnCmdStep2.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(204)))), ((int)(((byte)(235)))), ((int)(((byte)(229)))));
+            this.btnCmdStep2.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnCmdStep2.Font = new System.Drawing.Font("微软雅黑", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
+            this.btnCmdStep2.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(105)))), ((int)(((byte)(92)))));
+            this.btnCmdStep2.Location = new System.Drawing.Point(282, 86);
+            this.btnCmdStep2.Name = "btnCmdStep2";
+            this.btnCmdStep2.Size = new System.Drawing.Size(124, 28);
+            this.btnCmdStep2.TabIndex = 9;
+            this.btnCmdStep2.Text = "第 2 步 · 圈号拆分";
+            this.btnCmdStep2.UseVisualStyleBackColor = false;
+            this.btnCmdStep2.Click += new System.EventHandler(this.BtnCmdStep2_Click);
+            // 
+            // btnCmdStep3
+            // 
+            this.btnCmdStep3.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(225)))), ((int)(((byte)(245)))), ((int)(((byte)(242)))));
+            this.btnCmdStep3.Cursor = System.Windows.Forms.Cursors.Hand;
+            this.btnCmdStep3.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(152)))), ((int)(((byte)(214)))), ((int)(((byte)(208)))));
+            this.btnCmdStep3.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(204)))), ((int)(((byte)(235)))), ((int)(((byte)(229)))));
+            this.btnCmdStep3.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnCmdStep3.Font = new System.Drawing.Font("微软雅黑", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
+            this.btnCmdStep3.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(105)))), ((int)(((byte)(92)))));
+            this.btnCmdStep3.Location = new System.Drawing.Point(412, 86);
+            this.btnCmdStep3.Name = "btnCmdStep3";
+            this.btnCmdStep3.Size = new System.Drawing.Size(168, 28);
+            this.btnCmdStep3.TabIndex = 10;
+            this.btnCmdStep3.Text = "第 3 步 · 要領図部品追加";
+            this.btnCmdStep3.UseVisualStyleBackColor = false;
+            this.btnCmdStep3.Click += new System.EventHandler(this.BtnCmdStep3_Click);
+            // 
+            // btnCmdStep4
+            // 
+            this.btnCmdStep4.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(225)))), ((int)(((byte)(245)))), ((int)(((byte)(242)))));
+            this.btnCmdStep4.Cursor = System.Windows.Forms.Cursors.Hand;
+            this.btnCmdStep4.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(152)))), ((int)(((byte)(214)))), ((int)(((byte)(208)))));
+            this.btnCmdStep4.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(204)))), ((int)(((byte)(235)))), ((int)(((byte)(229)))));
+            this.btnCmdStep4.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnCmdStep4.Font = new System.Drawing.Font("微软雅黑", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
+            this.btnCmdStep4.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(105)))), ((int)(((byte)(92)))));
+            this.btnCmdStep4.Location = new System.Drawing.Point(586, 86);
+            this.btnCmdStep4.Name = "btnCmdStep4";
+            this.btnCmdStep4.Size = new System.Drawing.Size(206, 28);
+            this.btnCmdStep4.TabIndex = 12;
+            this.btnCmdStep4.Text = "第 4 步 · tz.json 部品追加";
+            this.btnCmdStep4.UseVisualStyleBackColor = false;
+            this.btnCmdStep4.Click += new System.EventHandler(this.BtnCmdStep4_Click);
+            // 
+            // lblCmdStepNote
+            // 
+            this.lblCmdStepNote.AutoSize = false;
+            this.lblCmdStepNote.Font = new System.Drawing.Font("微软雅黑", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
+            this.lblCmdStepNote.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(108)))), ((int)(((byte)(117)))), ((int)(((byte)(125)))));
+            this.lblCmdStepNote.Location = new System.Drawing.Point(100, 118);
+            this.lblCmdStepNote.Name = "lblCmdStepNote";
+            this.lblCmdStepNote.Size = new System.Drawing.Size(420, 18);
+            this.lblCmdStepNote.TabIndex = 11;
+            this.lblCmdStepNote.Text = "※ 上方【CMD 分析】= 依次跑完 4 步（第 4 步读 classify\\tz.json）";
+            this.lblCmdStepNote.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             // 
             // btnOpenOutput
             // 
@@ -364,9 +468,9 @@ namespace MSIFAITOOLS
             this.grpLog.Controls.Add(this.tabMain);
             this.grpLog.Font = new System.Drawing.Font("微软雅黑", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
             this.grpLog.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(52)))), ((int)(((byte)(73)))), ((int)(((byte)(94)))));
-            this.grpLog.Location = new System.Drawing.Point(20, 242);
+            this.grpLog.Location = new System.Drawing.Point(20, 282);
             this.grpLog.Name = "grpLog";
-            this.grpLog.Size = new System.Drawing.Size(860, 340);
+            this.grpLog.Size = new System.Drawing.Size(860, 300);
             this.grpLog.TabIndex = 2;
             this.grpLog.TabStop = false;
             this.grpLog.Text = "③  运行日志 / 分类结果";
@@ -661,6 +765,12 @@ namespace MSIFAITOOLS
         private System.Windows.Forms.Button btnStart;
         private System.Windows.Forms.Button btnAiAnalyze;
         private System.Windows.Forms.Button btnCmdAnalyze;
+        private System.Windows.Forms.Label lblCmdStepHint;
+        private System.Windows.Forms.Button btnCmdStep1;
+        private System.Windows.Forms.Button btnCmdStep2;
+        private System.Windows.Forms.Button btnCmdStep3;
+        private System.Windows.Forms.Button btnCmdStep4;
+        private System.Windows.Forms.Label lblCmdStepNote;
         private System.Windows.Forms.Button btnAiSettings;
         private System.Windows.Forms.Button btnOpenOutput;
         private System.Windows.Forms.Label lblProgress;

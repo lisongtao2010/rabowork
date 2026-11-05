@@ -409,6 +409,25 @@ namespace CadPartSplitter
         /// </summary>
         public bool BuildAssemblyYoryoList { get; set; } = true;
 
+        /// <summary>
+        /// 是否在流水线最后，把「图纸文件夹里的 Excel 部品表」抽成
+        /// <c>classify\tz.json</c>（默认开启）。
+        ///
+        /// 扫「图纸所在文件夹」下的所有 Excel（<c>.xls</c> / <c>.xlsx</c> / <c>.xlsm</c>，
+        /// <c>~$</c> 临时文件与 <c>AiAppData</c> 里的产物跳过），读工作簿里「カメラ」表的部品表，
+        /// 取这五列：<c>品種 / 部品名 / 枠区分 / 部品コード / 追加対応特注寸法</c>。
+        /// 参考版式：<c>H310Z10004.XLS</c> 的「カメラ」sheet。
+        ///
+        /// 输出位置与 <see cref="BuildPdfInfoList"/> 的清单同一个目录、同样是整批共用一份：
+        ///   · 单张：<c>&lt;图纸目录&gt;\AiAppData\classify\tz.json</c>；
+        ///   · 批量：<c>&lt;输出根目录&gt;\classify\tz.json</c>（<b>不是</b>每张图纸各一份）。
+        ///
+        /// 读取用 ExcelDataReader（只读，不要求机器上装 Excel）。没有「カメラ」表的工作簿、
+        /// 或表里凑不齐那 5 个列名时跳过并记日志；整批一张都没凑齐时不写文件，也不删旧文件。
+        /// 命令行的 <c>--no-tz</c> 关掉这一步。
+        /// </summary>
+        public bool BuildTzJson { get; set; } = true;
+
         // ── 输出 ─────────────────────────────────────────────────────────────
 
         /// <summary>

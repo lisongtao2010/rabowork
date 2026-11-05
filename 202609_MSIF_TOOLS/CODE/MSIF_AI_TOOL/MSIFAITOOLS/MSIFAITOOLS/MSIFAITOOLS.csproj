@@ -98,6 +98,10 @@
     <Compile Include="Services\CmdPartAnalyzer.cs" />
     <Compile Include="Services\CmdPartAnalysisService.cs" />
     <Compile Include="Services\CmdInstructionPartCollector.cs" />
+    <Compile Include="Services\CmdTzPartCollector.cs" />
+    <Compile Include="Services\CmdCalloutPartSplitter.cs" />
+    <Compile Include="Services\CmdAnalysisStep.cs" />
+    <Compile Include="Services\PartsInfoIndex.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

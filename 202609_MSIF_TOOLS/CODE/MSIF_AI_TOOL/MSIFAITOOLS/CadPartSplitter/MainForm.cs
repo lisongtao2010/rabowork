@@ -612,6 +612,21 @@ namespace CadPartSplitter
                 var parts = await Task.Run(() => PartSplitterService.Run(input, opts));
                 int count = parts.Count;
 
+                // 流水线最后一步：图纸所在文件夹里的 Excel 部品表 → classify\tz.json
+                // （与 classify\PdfInfoList.txt 同目录；读「カメラ」sheet 的
+                //  品種 / 部品名 / 枠区分 / 部品コード / 追加対応特注寸法 五列）
+                if (opts.BuildTzJson)
+                {
+                    string excelFolder = GetDirectoryOrNull(input);
+                    string drawingNumber = Path.GetFileNameWithoutExtension(input);
+
+                    await Task.Run(() => TzJsonBuilder.Build(
+                        excelFolder,
+                        PdfInfoListBuilder.GetClassifyDirectory(outputDir, drawingNumber),
+                        false,
+                        opts));
+                }
+
                 if (count > 0)
                 {
                     AppendLog(string.Empty);

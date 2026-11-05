@@ -107,6 +107,24 @@ namespace MSIFAITOOLS.Services
 
         /// <summary>追加步骤（要領図 部品）：缺少 01 / 02 文件的个数。</summary>
         public int InstructionMissingFileCount { get; set; }
+
+        /// <summary>追加步骤（按圈号分割）：实际分割了部品行的 アッセンブリ図 数量。</summary>
+        public int SplitDrawingCount { get; set; }
+
+        /// <summary>追加步骤（按圈号分割）：被分割的部品行数。</summary>
+        public int SplitGroupCount { get; set; }
+
+        /// <summary>追加步骤（按圈号分割）：因分割新增的行数。</summary>
+        public int SplitRowCount { get; set; }
+
+        /// <summary>追加步骤（tz.json 部品）：处理到的 アッセンブリ図 数量。</summary>
+        public int TzDrawingCount { get; set; }
+
+        /// <summary>追加步骤（tz.json 部品）：读到的 tz.json 明细条数。</summary>
+        public int TzEntryCount { get; set; }
+
+        /// <summary>追加步骤（tz.json 部品）：品種命中分类依据并登录的行数。</summary>
+        public int TzRowCount { get; set; }
     }
 
     /// <summary>

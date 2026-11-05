@@ -1,10 +1,11 @@
 {
   "version": 2,
-  "dgSpecHash": "ZJOwj+6LGPk=",
+  "dgSpecHash": "/v7yoIAh5kI=",
   "success": true,
   "projectFilePath": "D:\\Github_lis2010\\rabowork\\202609_MSIF_TOOLS\\CODE\\MSIF_AI_TOOL\\MSIFAITOOLS\\CadPartSplitter\\CadPartSplitter.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\11043787\\.nuget\\packages\\docnet.core\\2.6.0\\docnet.core.2.6.0.nupkg.sha512",
+    "C:\\Users\\11043787\\.nuget\\packages\\exceldatareader\\3.6.0\\exceldatareader.3.6.0.nupkg.sha512",
     "C:\\Users\\11043787\\.nuget\\packages\\microsoft.bcl.hashcode\\1.1.1\\microsoft.bcl.hashcode.1.1.1.nupkg.sha512",
     "C:\\Users\\11043787\\.nuget\\packages\\opencvsharp4\\4.10.0.20240616\\opencvsharp4.4.10.0.20240616.nupkg.sha512",
     "C:\\Users\\11043787\\.nuget\\packages\\opencvsharp4.runtime.win\\4.10.0.20240616\\opencvsharp4.runtime.win.4.10.0.20240616.nupkg.sha512",

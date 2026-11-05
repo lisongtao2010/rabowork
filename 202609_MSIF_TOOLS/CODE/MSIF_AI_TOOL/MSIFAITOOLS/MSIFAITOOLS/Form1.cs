@@ -49,6 +49,12 @@ namespace MSIFAITOOLS
             _startButtonText = btnStart.Text;
             _aiButtonText = btnAiAnalyze.Text;
             _cmdButtonText = btnCmdAnalyze.Text;
+
+            // 四个子按钮的文字统一取自 CmdAnalysisSteps（步骤名的唯一定义处），保证按钮 / 日志叫法一致
+            btnCmdStep1.Text = CmdAnalysisSteps.ButtonText(CmdAnalysisStepKind.Assembly);
+            btnCmdStep2.Text = CmdAnalysisSteps.ButtonText(CmdAnalysisStepKind.CalloutSplit);
+            btnCmdStep3.Text = CmdAnalysisSteps.ButtonText(CmdAnalysisStepKind.YoryoAppend);
+            btnCmdStep4.Text = CmdAnalysisSteps.ButtonText(CmdAnalysisStepKind.TzAppend);
         }
 
         /// <summary>
@@ -212,6 +218,11 @@ namespace MSIFAITOOLS
             btnStart.Enabled = !running;
             btnAiAnalyze.Enabled = !running;
             btnCmdAnalyze.Enabled = !running;
+            // 四个子按钮（第 1 / 2 / 3 / 4 步）执行期间只置灰，文字保持不变
+            btnCmdStep1.Enabled = !running;
+            btnCmdStep2.Enabled = !running;
+            btnCmdStep3.Enabled = !running;
+            btnCmdStep4.Enabled = !running;
             btnAiSettings.Enabled = !running;
             btnBrowse.Enabled = !running;
             txtFolder.Enabled = !running;
@@ -850,12 +861,53 @@ namespace MSIFAITOOLS
         /// 01_アッセンブリ図_部品機能情報.csv（&lt;输出根目录&gt;\&lt;図番号&gt;\…，旧名 LT_STEP1.csv），
         /// 以 xy.txt 校验后登录到与【AI 分析】相同的 SQLite 表。
         ///
-        /// 追加步骤：再按 PdfInfoList.txt 的「分类依据」，顺着
-        /// 01_アッセンブリ図_要領図.csv → 各要領図的 02_要領図_部品機能情報.csv，
-        /// 把「品種命中分类依据」的部品行也登录到同一张表。
+        /// 点一次依次走 4 步（名字见 <see cref="CmdAnalysisSteps"/>，日志前缀为「【第 N 步 · 名字】」）：
+        /// 第 1 步 装配图部品入库 → 第 2 步 圈号拆分 → 第 3 步 要領図部品追加 → 第 4 步 tz.json 部品追加。
+        /// 第 2 / 3 步按 PdfInfoList.txt 的「分类依据」与 01_アッセンブリ図_要領図.csv →
+        /// 各要領図的 02_要領図_部品機能情報.csv 追加部品；第 4 步按同一份分类依据把 classify\tz.json
+        /// （Excel 部品表）里「品種」命中的明细追加进来，全部登录到同一张表。
         /// 登录后可在【分类结果】选中 PDF 行 →【部品信息】查看明细。
+        /// 步骤说明见 docs\CMD分析_步骤命名.md。
         /// </summary>
         private async void BtnCmdAnalyze_Click(object sender, EventArgs e)
+        {
+            await RunCmdAnalysisAsync(CmdAnalysisStepKind.All);
+        }
+
+        /// <summary>子按钮【第 1 步 · 装配图部品入库】：只重跑第 1 步（读 01_アッセンブリ図_部品機能情報.csv → 入库）。</summary>
+        private async void BtnCmdStep1_Click(object sender, EventArgs e)
+        {
+            await RunCmdAnalysisAsync(CmdAnalysisStepKind.Assembly);
+        }
+
+        /// <summary>子按钮【第 2 步 · 圈号拆分】：只重跑第 2 步（按 parts_info.json 的圈号把部品行按位置拆分）。</summary>
+        private async void BtnCmdStep2_Click(object sender, EventArgs e)
+        {
+            await RunCmdAnalysisAsync(CmdAnalysisStepKind.CalloutSplit);
+        }
+
+        /// <summary>子按钮【第 3 步 · 要領図部品追加】：只重跑第 3 步（挂各要領図的 02_要領図_部品機能情報.csv）。</summary>
+        private async void BtnCmdStep3_Click(object sender, EventArgs e)
+        {
+            await RunCmdAnalysisAsync(CmdAnalysisStepKind.YoryoAppend);
+        }
+
+        /// <summary>
+        /// 子按钮【第 4 步 · tz.json 部品追加】：只重跑第 4 步
+        /// （classify\tz.json 里品種命中アッセンブリ図 分类依据的明细挂到该図番上）。
+        /// </summary>
+        private async void BtnCmdStep4_Click(object sender, EventArgs e)
+        {
+            await RunCmdAnalysisAsync(CmdAnalysisStepKind.TzAppend);
+        }
+
+        /// <summary>
+        /// 【CMD 分析】主按钮（<see cref="CmdAnalysisStepKind.All"/>）与四个子按钮共用的执行流程：
+        /// 校验分类 / 输出目录 → 做快照 → 后台执行 <see cref="CmdPartAnalysisService"/> 的分析 → 汇总显示。
+        /// 单步执行时只跑该步，日志里仍用「【第 N 步 · 名字】」前缀。
+        /// </summary>
+        /// <param name="stepKind">要执行的步骤。</param>
+        private async Task RunCmdAnalysisAsync(CmdAnalysisStepKind stepKind)
         {
             if (_isRunning)
             {
@@ -906,19 +958,24 @@ namespace MSIFAITOOLS
             progressBar.Style = ProgressBarStyle.Continuous;
             progressBar.Value = 0;
 
+            // 主按钮 / 子按钮共用：日志与状态栏都用同一步骤名（名字来自 CmdAnalysisSteps）
+            CmdAnalysisStep step = CmdAnalysisSteps.GetStep(stepKind);
+            string actionName = step == null ? "CMD 分析" : step.Label;
+
             SetRunning(true);
             tabMain.SelectedTab = tabPageLog;
 
             AppendLog("==================================================", Color.FromArgb(90, 90, 90));
-            AppendLog(string.Format("CMD 分析开始：{0} 个「{1}」PDF（不调用 AI：{2} + 要領図の部品情報）",
-                snapshot.Count, PdfCategoryNames.Assembly, CmdPartAnalyzer.LtStep1FileName),
+            AppendLog(string.Format("{0} 开始：{1} 个「{2}」PDF（不调用 AI：{3} + 要領図の部品情報）",
+                actionName, snapshot.Count, PdfCategoryNames.Assembly, CmdPartAnalyzer.LtStep1FileName),
                 Color.FromArgb(120, 200, 255));
+            AppendLog(CmdAnalysisSteps.DescribeRun(stepKind), Color.FromArgb(120, 200, 255));
             AppendLog("分解输出目录：" + outputDir, Color.FromArgb(180, 180, 180));
             AppendLog("部品基本信息数据库：" + PartBasicInfoRepository.ResolveDatabasePath(),
                 Color.FromArgb(180, 180, 180));
 
-            SetStatus("正在 CMD 分析（共 " + snapshot.Count + " 个 PDF）...", Color.FromArgb(230, 126, 34));
-            lblProgress.Text = "CMD 分析中...";
+            SetStatus("正在 " + actionName + "（共 " + snapshot.Count + " 个 PDF）...", Color.FromArgb(230, 126, 34));
+            lblProgress.Text = actionName + " 中...";
 
             PartAnalysisSummary summary = null;
             Exception failure = null;
@@ -931,7 +988,7 @@ namespace MSIFAITOOLS
                 // 后台线程执行：用匿名方法（delegate）代替 Lambda 表达式
                 Func<PartAnalysisSummary> analyzeWork = delegate
                 {
-                    return service.AnalyzeAndSave(snapshot, outputDir, OnServiceLog);
+                    return service.AnalyzeAndSave(snapshot, outputDir, OnServiceLog, stepKind);
                 };
 
                 summary = await Task.Run(analyzeWork);
@@ -945,18 +1002,18 @@ namespace MSIFAITOOLS
 
             if (failure != null)
             {
-                AppendLog("CMD 分析失败：" + failure.Message, Color.FromArgb(255, 140, 140));
-                SetStatus("CMD 分析异常", Color.FromArgb(198, 40, 40));
-                lblProgress.Text = "CMD 分析异常";
-                MessageBox.Show(this, "CMD 分析失败：\n" + failure.Message, "异常",
+                AppendLog(actionName + " 失败：" + failure.Message, Color.FromArgb(255, 140, 140));
+                SetStatus(actionName + " 异常", Color.FromArgb(198, 40, 40));
+                lblProgress.Text = actionName + " 异常";
+                MessageBox.Show(this, actionName + " 失败：\n" + failure.Message, "异常",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
 
             if (summary == null)
             {
-                SetStatus("CMD 分析未返回结果", Color.FromArgb(198, 40, 40));
-                lblProgress.Text = "CMD 分析未返回结果";
+                SetStatus(actionName + " 未返回结果", Color.FromArgb(198, 40, 40));
+                lblProgress.Text = actionName + " 未返回结果";
                 return;
             }
 
@@ -964,7 +1021,7 @@ namespace MSIFAITOOLS
 
             progressBar.Style = ProgressBarStyle.Continuous;
             progressBar.Value = summary.SavedRowCount > 0 ? progressBar.Maximum : 0;
-            lblProgress.Text = "CMD 分析完成";
+            lblProgress.Text = actionName + " 完成";
 
             AppendLog("--------------------------------------------------", Color.FromArgb(90, 90, 90));
             AppendLog(summaryText, summary.SavedRowCount > 0
@@ -977,7 +1034,7 @@ namespace MSIFAITOOLS
                 : Color.FromArgb(46, 125, 50));
 
             MessageBox.Show(this,
-                "CMD 分析完成！\n\n" + summaryText + "\n\n" +
+                actionName + " 完成！\n\n" + summaryText + "\n\n" +
                 "部品基本信息数据库：\n" + summary.DatabasePath + "\n\n" +
                 "可在【分类结果】选中 PDF 行后点击【部品信息】查看登录的部品基本信息。",
                 "完成", MessageBoxButtons.OK, MessageBoxIcon.Information);

@@ -5,8 +5,9 @@ using System.IO;
 namespace CadPartSplitter
 {
     /// <summary>
-    /// 品種表整理：读 <c>tables\table_NN.csv</c>，把「横向重复 N 组 (部品コード, 員数)」这类
-    /// 「多列重复」的表摊平成一行一个部品的 <c>02_要領図_部品機能情報.csv</c>。
+    /// 品種表整理：读 <c>tables\table_NN.csv</c>，把两种表摊平成一行一个部品的
+    /// <c>02_要領図_部品機能情報.csv</c>：①「横向重复 N 组 (部品コード, 員数)」的多列重复品種表；
+    /// ②图纸上普通的「単純部品表」（<c>部品名 / 枠区分 / 部品コード</c>）。
     ///
     /// 认得的样子（图纸上常见，表头被拆成两行 + 合并单元格）：
     /// <code>
@@ -15,22 +16,37 @@ namespace CadPartSplitter
     /// ,,,,,,,
     /// 片引戸,MEACC428,1,MEACC428,2, …
     /// </code>
-    /// 整理成（一行一个部品，品種 / 品名往下填满）：
+    /// 整理成（一行一个部品，品種 / 品名往下填满；品種表里没有「枠区分」列，该格留空）：
     /// <code>
-    /// 品種,部品名,部品コード,員数
-    /// 片引戸,縦枠上部スペーサー,MEACC428,1
-    /// 片引戸,小縦枠上部スペーサー,MEACC428,2
+    /// 品種,部品名,枠区分,部品コード,員数
+    /// 片引戸,縦枠上部スペーサー,,MEACC428,1
+    /// 片引戸,小縦枠上部スペーサー,,MEACC428,2
     /// </code>
     ///
-    /// 判定（两条同时满足才认）：
+    /// 收录两种表：
+    /// <para>
+    /// ①「多列重复的品種表」（上面那种）—— 两条同时满足才认：
     ///   · 表头区里有含「品種」的单元格 → 品種列；
     ///   · 表头区里存在「同一个列名出现 ≥ 2 次」的行（多列重复）→ 每次出现的列就是一组部品ブロック的起点。
-    /// 只有一块、没有重复列的表不是这种表，原样跳过（不改动）。
+    /// 只有一块、没有重复列的表不是这种表。
+    /// </para>
+    /// <para>
+    /// ②「単純部品表」—— 图纸上普通的部品表（<c>H310U10034.pdf</c> / <c>H310U10027.pdf</c> 那种，
+    /// 只有一个部品、没有品種列）：
+    /// </para>
+    /// <code>
+    /// 番号,部品名,枠区分,員数,基本寸法,切断寸法,部品コード
+    /// 1,ロットＮｏ．ラベル,三方枠,1,-,-,LAVS639
+    /// </code>
+    /// 表头（前 6 行内）同时含「部品名」「枠区分」「部品コード」即认这种表：一行一条明细，
+    /// <c>品種</c> 留空（这种表本来就没有品種列）、<c>枠区分</c> 按列名搬 → <c>,ロットＮｏ．ラベル,三方枠,LAVS639,1</c>。
+    /// <para>两种都不是的表原样跳过（不改动）。</para>
     ///
     /// 输出：<c>&lt;输出目录&gt;\02_要領図_部品機能情報.csv</c>（旧名 <c>LT_STEP2.csv</c>；
     /// 要領図 = 要領書，部品機能情報 = 部品表。UTF-8 带 BOM + CRLF + RFC 4180），
-    /// 列固定为 品種 / 部品名 / 部品コード / 員数 —— 下游按固定列取数。
-    /// 多张品種表按文件名顺序追加到同一个文件。只读 <c>tables\*.csv</c>，不改动任何已有产物。
+    /// 列固定为 品種 / 部品名 / 枠区分 / 部品コード / 員数 —— 下游按固定列取数
+    /// （品種表没有枠区分列 → 该格留空；単純部品表没有品種列 → 该格留空）。
+    /// 多张表按文件名顺序追加到同一个文件。只读 <c>tables\*.csv</c>，不改动任何已有产物。
     ///
     /// **只有要領図（要領書）才写这份清单**：图面分类读自分类清单 <c>classify\PdfInfoList.txt</c>
     /// （<see cref="PdfInfoListBuilder"/> 在流水线里先跑一步生成；清单缺失 / 没有这张图时退回按
@@ -64,13 +80,19 @@ namespace CadPartSplitter
         /// <summary>块里的数量列名。</summary>
         private const string QuantityKeyword = "員数";
 
-        /// <summary>找表头（品種列 / 重复列名行）时最多看前几行。</summary>
+        /// <summary>
+        /// 「単純部品表」（<c>番号 / 部品名 / 枠区分 / 員数 / 基本寸法 / 切断寸法 / 部品コード</c>）的标志列名
+        /// —— 和 <see cref="PartNameKeyword"/> / <see cref="PartCodeKeyword"/> 同时出现才认这种表。
+        /// </summary>
+        private const string FrameKeyword = "枠区分";
+
+        /// <summary>找表头（品種列 / 重复列名行 / 部品名+枠区分+部品コード 行）时最多看前几行。</summary>
         private const int MaxHeaderScanRows = 6;
 
-        /// <summary>输出表头：固定 4 列，下游按列取数。</summary>
+        /// <summary>输出表头：固定 5 列，下游按列取数。</summary>
         private static readonly string[] OutHeader =
         {
-            VarietyKeyword, PartNameKeyword, PartCodeKeyword, QuantityKeyword
+            VarietyKeyword, PartNameKeyword, FrameKeyword, PartCodeKeyword, QuantityKeyword
         };
 
         /// <summary>
@@ -142,22 +164,31 @@ namespace CadPartSplitter
                 if (rows.Count == 0)
                     continue;
 
+                // 两种表都收：①多列重复的品種表（横向排开 N 组部品）
+                //             ②単純部品表（番号 / 部品名 / 枠区分 / 員数 / … / 部品コード，品種留空）
                 List<string[]> detail = Expand(rows);
+                string form = "多列重复的品種表";
 
                 if (detail == null)
-                    continue;   // 不是「品種 + 多列重复」表
+                {
+                    detail = ExpandPartTable(rows);
+                    form = "単純部品表（部品名 / 枠区分 / 部品コード）";
+                }
+
+                if (detail == null || detail.Count == 0)
+                    continue;   // 两种形式都不是（或表头下面一条明细都没有）→ 不动这张表
 
                 tables++;
                 output.AddRange(detail);
 
-                o.Log("[INFO] 02_要領図_部品機能情報：" + Path.GetFileName(file) + " 是多列重复的品種表 → 摊平 "
+                o.Log("[INFO] 02_要領図_部品機能情報：" + Path.GetFileName(file) + " 是" + form + " → 摊平 "
                       + detail.Count + " 条明细。");
             }
 
             if (tables == 0)
             {
-                o.Log("[INFO] 02_要領図_部品機能情報：未找到「含品種列且列名重复」的表格，不生成 "
-                      + OutputFileName + "。");
+                o.Log("[INFO] 02_要領図_部品機能情報：未找到品種表（品種 + 列名重复）或単純部品表"
+                      + "（部品名 / 枠区分 / 部品コード），不生成 " + OutputFileName + "。");
                 return 0;
             }
 
@@ -166,7 +197,7 @@ namespace CadPartSplitter
             DeleteLegacyOutput(outputDirectory, o);
             CsvFile.Write(path, OutHeader, output);
 
-            o.Log("[INFO] 02_要領図_部品機能情報：" + tables + " 张品種表 → 共 " + output.Count + " 条明细，已保存：" + path);
+            o.Log("[INFO] 02_要領図_部品機能情報：" + tables + " 张表 → 共 " + output.Count + " 条明细，已保存：" + path);
 
             return output.Count;
         }
@@ -219,7 +250,8 @@ namespace CadPartSplitter
         // ── 摊平 ─────────────────────────────────────────────────────────────
 
         /// <summary>
-        /// 摊平一张表：找「列名重复」的表头行 → 按块拆出 (品種, 部品名, 部品コード, 員数)。
+        /// 摊平一张表：找「列名重复」的表头行 → 按块拆出 (品種, 部品名, 枠区分, 部品コード, 員数)。
+        /// 这种表没有「枠区分」列，该格固定留空。
         /// 不是「品種 + 多列重复」表 → 返回 null（调用方跳过，不动这张表）。
         /// </summary>
         private static List<string[]> Expand(List<string[]> rows)
@@ -338,11 +370,129 @@ namespace CadPartSplitter
                         ? Cell(row, quantityColumns[b]).Trim()
                         : string.Empty;
 
-                    detail.Add(new string[] { variety, names[b], code, quantity });
+                    // 品種表里没有「枠区分」列 → 该格固定留空（输出列数与単純部品表一致）
+                    detail.Add(new string[] { variety, names[b], string.Empty, code, quantity });
                 }
             }
 
             return detail;
+        }
+
+        // ── 単純部品表 ───────────────────────────────────────────────────────
+
+        /// <summary>
+        /// 摊平第二种形式：「単純部品表」—— 图纸上普通的部品表
+        /// （表头 <c>番号 / 部品名 / 枠区分 / 員数 / 基本寸法 / 切断寸法 / 部品コード</c>，
+        /// 没有品種列、也没有重复列名）。一行一条明细：<c>品種</c> 留空，
+        /// <c>部品名 / 枠区分 / 部品コード / 員数</c> 都按列名搬。
+        /// 不是这种表 → 返回 null（调用方跳过，不动这张表）。
+        /// </summary>
+        private static List<string[]> ExpandPartTable(List<string[]> rows)
+        {
+            if (rows == null || rows.Count == 0)
+                return null;
+
+            int headerRow = -1;     // 表头起始行（含「部品名」「枠区分」那一行）
+            int detailStart = -1;   // 明细从哪一行开始（表头可能占两行）
+            int nameColumn = -1;
+            int frameColumn = -1;
+            int codeColumn = -1;
+            int quantityColumn = -1;
+
+            // 1) 前 6 行里找表头：必须有「部品名」+「枠区分」，还要有「部品コード」
+            //    —— 三个词一般同一行；表头被拆成两行时「部品コード」落在紧跟的下一行，也认。
+            //    表題欄 / 変更履歴表 / 枠タイプ表不会同时出现这几个词，`A部` 那种空框也不会。
+            int scan = Math.Min(MaxHeaderScanRows, rows.Count);
+
+            for (int r = 0; r < scan; r++)
+            {
+                int name = FindColumn(rows[r], PartNameKeyword);
+                int frame = FindColumn(rows[r], FrameKeyword);
+
+                if (name < 0 || frame < 0)
+                    continue;
+
+                int code = FindColumn(rows[r], PartCodeKeyword);
+                int start = r + 1;
+
+                if (code < 0 && start < rows.Count)
+                {
+                    // 表头拆成两行：上面一行是 番号 / 部品名 / 枠区分，下面一行才是 部品コード …
+                    code = FindColumn(rows[start], PartCodeKeyword);
+
+                    if (code < 0)
+                        continue;
+
+                    start++;    // 第二行也算表头，明细从它的下一行开始
+                }
+
+                if (code < 0)
+                    continue;
+
+                headerRow = r;
+                detailStart = start;
+                nameColumn = name;
+                frameColumn = frame;
+                codeColumn = code;
+                quantityColumn = FindColumn(rows[r], QuantityKeyword);
+
+                if (quantityColumn < 0 && start > r + 1)
+                    quantityColumn = FindColumn(rows[r + 1], QuantityKeyword);
+
+                break;
+            }
+
+            if (headerRow < 0)
+                return null;
+
+            // 2) 明细：一行一条，品番为空 / 表中间重复出现的表头行都跳过
+            var detail = new List<string[]>();
+
+            for (int r = detailStart; r < rows.Count; r++)
+            {
+                string[] row = rows[r];
+
+                if (CsvFile.IsEmptyRow(row))
+                    continue;   // 合并单元格 / 表格线造成的空行
+
+                string code = Cell(row, codeColumn).Trim();
+
+                if (code.Length == 0)
+                    continue;   // 这一行没有品番
+
+                if (CsvFile.Normalize(code).IndexOf(PartCodeKeyword, StringComparison.Ordinal) >= 0)
+                    continue;   // 表中间重复出现的表头行
+
+                string name = Cell(row, nameColumn).Trim();
+                string frameValue = frameColumn >= 0
+                    ? Cell(row, frameColumn).Trim()
+                    : string.Empty;
+                string quantity = quantityColumn >= 0
+                    ? Cell(row, quantityColumn).Trim()
+                    : string.Empty;
+
+                // 这种表没有品種列 → 品種留空；枠区分 按列名搬
+                detail.Add(new string[] { string.Empty, name, frameValue, code, quantity });
+            }
+
+            return detail;
+        }
+
+        /// <summary>
+        /// 在一行里找含 <paramref name="keyword"/> 的列（左 → 右），-1 表示这一行没有这一列。
+        /// </summary>
+        private static int FindColumn(string[] row, string keyword)
+        {
+            if (row == null)
+                return -1;
+
+            for (int c = 0; c < row.Length; c++)
+            {
+                if (CsvFile.Normalize(row[c]).IndexOf(keyword, StringComparison.Ordinal) >= 0)
+                    return c;
+            }
+
+            return -1;
         }
 
         // ── 表头判定 ─────────────────────────────────────────────────────────

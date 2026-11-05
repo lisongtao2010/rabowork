@@ -82,3 +82,5 @@ D:\Github_lis2010\rabowork\202609_MSIF_TOOLS\CODE\MSIF_AI_TOOL\MSIFAITOOLS\CadPa
 D:\Github_lis2010\rabowork\202609_MSIF_TOOLS\CODE\MSIF_AI_TOOL\MSIFAITOOLS\CadPartSplitter\obj\Debug\CadPartSplitter.csproj.GenerateResource.cache
 D:\Github_lis2010\rabowork\202609_MSIF_TOOLS\CODE\MSIF_AI_TOOL\MSIFAITOOLS\CadPartSplitter\obj\Debug\CadPartSplitter.csproj.CoreCompileInputs.cache
 D:\Github_lis2010\rabowork\202609_MSIF_TOOLS\CODE\MSIF_AI_TOOL\MSIFAITOOLS\CadPartSplitter\obj\Debug\CadPartS.DA2E9D46.Up2Date
+D:\Github_lis2010\rabowork\202609_MSIF_TOOLS\CODE\MSIF_AI_TOOL\MSIFAITOOLS\CadPartSplitter\bin\Debug\ExcelDataReader.dll
+D:\Github_lis2010\rabowork\202609_MSIF_TOOLS\CODE\MSIF_AI_TOOL\MSIFAITOOLS\CadPartSplitter\bin\Debug\ExcelDataReader.pdb

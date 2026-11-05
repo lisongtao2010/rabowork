@@ -282,6 +282,8 @@ namespace MSIFAITOOLS.Services
                         partDrawingNo, Cell(row, frameCol), Cell(row, quantityCol),
                         Cell(row, basicSizeCol), Cell(row, cutSizeCol), partCode);
 
+                    part.SourceKind = PartSourceKind.CmdAssembly;
+                    part.SourceTag = PartSourceTag.CmdAssembly;
                     part.SourceFile = source.FilePath;
                     part.PdfFile = pdfFilePath ?? string.Empty;
 

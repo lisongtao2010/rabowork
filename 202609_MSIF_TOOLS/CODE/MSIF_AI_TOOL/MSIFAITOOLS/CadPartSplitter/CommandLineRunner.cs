@@ -33,6 +33,7 @@ namespace CadPartSplitter
     ///   --no-lt-step1    关闭「部品表下表参照展开」（不生成 01_アッセンブリ図_部品機能情報.csv）
     ///   --no-lt-step2    关闭「品種 × 多列重复表摊平」（不生成 02_要領図_部品機能情報.csv）
     ///   --no-assembly-yoryo 关闭「要領図一覧」（不生成 01_アッセンブリ図_要領図.csv）
+    ///   --no-tz         关闭「Excel 部品表」（不读图纸文件夹里的 Excel，不生成 classify\tz.json）
     ///   --area &lt;值&gt;      最小轮廓面积阈值（默认 25000）
     ///   --pad &lt;值&gt;       外接框扩展像素（默认 30）
     ///   --kw &lt;值&gt;        膨胀核宽度（默认 60）
@@ -161,12 +162,43 @@ namespace CadPartSplitter
                                   + "\\" + PdfInfoListBuilder.OutputFileName + "（整批共用一份）");
             }
 
+            if (opts.BuildTzJson)
+            {
+                // Excel 部品表：读「图纸所在文件夹」里的 Excel，最后写进同一个 classify 目录
+                Console.WriteLine("[INFO] Excel 部品表："
+                                  + PdfInfoListBuilder.GetClassifyDirectory(
+                                        opts.OutputDirectory, Path.GetFileNameWithoutExtension(inputPath))
+                                  + "\\" + TzJsonBuilder.OutputFileName
+                                  + "（扫文件夹里的 Excel，读「" + TzJsonBuilder.PreferredSheetName + "」表 "
+                                  + "品種 / 部品名 / 枠区分 / 部品コード / 追加対応特注寸法 五列）");
+            }
+
             Console.WriteLine();
 
             try
             {
                 var parts = PartSplitterService.Run(inputPath, opts);
                 int count = parts.Count;
+
+                // 流水线最后一步：图纸所在文件夹里的 Excel 部品表 → classify\tz.json
+                // （整批共用一份，与 classify\PdfInfoList.txt 同目录；读「カメラ」sheet 的五列）
+                if (opts.BuildTzJson)
+                {
+                    try
+                    {
+                        TzJsonBuilder.Build(
+                            Path.GetDirectoryName(Path.GetFullPath(inputPath)),
+                            PdfInfoListBuilder.GetClassifyDirectory(
+                                opts.OutputDirectory, Path.GetFileNameWithoutExtension(inputPath)),
+                            false,
+                            opts);
+                    }
+                    catch (Exception ex)
+                    {
+                        // 这一步只是附加产物：出问题时只记一行警告，不影响已分割的结果
+                        Console.Error.WriteLine($"[WARN] tz.json：{ex.GetType().Name}: {ex.Message}");
+                    }
+                }
 
                 Console.WriteLine();
                 if (count > 0)
@@ -208,6 +240,10 @@ namespace CadPartSplitter
                               : "关闭"));
             Console.WriteLine("[INFO] 要領図一覧 ：" + (opts.BuildAssemblyYoryoList
                               ? "生成 01_アッセンブリ図_要領図.csv（仅アッセンブリ図）"
+                              : "关闭"));
+            Console.WriteLine("[INFO] Excel 部品表：" + (opts.BuildTzJson
+                              ? "扫图纸文件夹里的 Excel，读「" + TzJsonBuilder.PreferredSheetName
+                                + "」表 5 列 → classify\\" + TzJsonBuilder.OutputFileName + "（全部图纸跑完后一次生成）"
                               : "关闭"));
             Console.WriteLine($"[INFO] DPI / 页码：{opts.RenderDpi:0} / {opts.PdfPageIndex}（对每张 PDF 生效）");
             Console.WriteLine();
@@ -392,6 +428,11 @@ namespace CadPartSplitter
                         opts.BuildAssemblyYoryoList = false;
                         break;
 
+                    case "--no-tz":
+                        // 关闭「Excel 部品表」（不读图纸文件夹里的 Excel，不生成 classify\tz.json）
+                        opts.BuildTzJson = false;
+                        break;
+
                     case "--area":
                         if (TryGetNextDouble(args, ref i, out double area))
                             opts.MinContourArea = area;
@@ -475,6 +516,7 @@ namespace CadPartSplitter
             Console.WriteLine("  --no-lt-step1   关闭「部品表下表参照展开」（不生成 01_アッセンブリ図_部品機能情報.csv）");
             Console.WriteLine("  --no-lt-step2   关闭「品種 × 多列重复表摊平」（不生成 02_要領図_部品機能情報.csv）");
             Console.WriteLine("  --no-assembly-yoryo 关闭「要領図一覧」（不生成 01_アッセンブリ図_要領図.csv）");
+            Console.WriteLine("  --no-tz         关闭「Excel 部品表」（不读图纸文件夹里的 Excel，不生成 classify\\tz.json）");
             Console.WriteLine("  --area  <N>    最小轮廓面积（默认 25000）");
             Console.WriteLine("  --pad   <N>    外接框扩展像素（默认 30）");
             Console.WriteLine("  --kw    <N>    膨胀核宽度（默认 60）");
@@ -505,6 +547,10 @@ namespace CadPartSplitter
             Console.WriteLine("                    / --no-assembly-yoryo 可关闭）");
             Console.WriteLine("  <输出根目录> 下的 drawing_list.csv（図番号 / 文件名 / 分类）");
             Console.WriteLine("  （--list 时随批量处理一并生成；--list-only 时只生成它，不做分割）");
+            Console.WriteLine("  <输出根目录>\\classify\\tz.json");
+            Console.WriteLine("  （Excel 部品表：图纸文件夹里各 Excel「カメラ」sheet 的");
+            Console.WriteLine("    品種 / 部品名 / 枠区分 / 部品コード / 追加対応特注寸法，一条明细一行；");
+            Console.WriteLine("    与 PdfInfoList.txt 同目录、同样整批共用一份，全部图纸跑完后一次生成）");
             Console.WriteLine();
             Console.WriteLine("示例：");
             Console.WriteLine("  CadPartSplitter.exe drawing.pdf            （输出到 <图纸目录>\\AiAppData\\drawing）");

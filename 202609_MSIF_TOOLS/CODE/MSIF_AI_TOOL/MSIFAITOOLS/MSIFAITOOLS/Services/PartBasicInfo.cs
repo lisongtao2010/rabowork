@@ -23,6 +23,8 @@ namespace MSIFAITOOLS.Services
             PartCode = Clean(partCode);
             VerifyStatus = PartVerifyStatus.NotChecked;
             Remark = string.Empty;
+            SourceKind = string.Empty;
+            SourceTag = string.Empty;
             SourceFile = string.Empty;
             PdfFile = string.Empty;
             LoginTime = string.Empty;
@@ -64,6 +66,12 @@ namespace MSIFAITOOLS.Services
         /// <summary>备注：坐标校验明细、AI 提示等。</summary>
         public string Remark { get; set; }
 
+        /// <summary>数据来源（取值见 <see cref="PartSourceKind"/>）：AI 分析 / CMD 分析・アッセンブリ図 / CMD 分析・要領図 / 手工追加。</summary>
+        public string SourceKind { get; set; }
+
+        /// <summary>来源标识（取值见 <see cref="PartSourceTag"/>）：要領図 / アッセンブリ図 / AI分析 / 手工追加。</summary>
+        public string SourceTag { get; set; }
+
         /// <summary>来源文件（plu_table.txt 的完整路径）。</summary>
         public string SourceFile { get; set; }
 
@@ -99,5 +107,90 @@ namespace MSIFAITOOLS.Services
 
         /// <summary>全部状态（画面下拉框的候选项）。</summary>
         public static readonly string[] All = new string[] { Passed, Failed, NotChecked };
+    }
+
+    /// <summary>
+    /// 部品基本信息的「数据来源」（同时作为写入数据库的文字）。
+    /// 用于区分同一张装配图下的行是哪个功能登录进来的：
+    /// 【AI 分析】读 plu_table.txt；【CMD 分析】阶段 A 读 01_アッセンブリ図_部品機能情報.csv，
+    /// 阶段 B 读 02_要領図_部品機能情報.csv；画面上还能手工追加行。
+    /// </summary>
+    internal static class PartSourceKind
+    {
+        /// <summary>【AI 分析】：用 AI 从 plu_table.txt 提取（<c>AiPartAnalyzer</c>）。</summary>
+        public const string AiAnalysis = "AI分析";
+
+        /// <summary>【CMD 分析】阶段 A：读 01_アッセンブリ図_部品機能情報.csv（<c>CmdPartAnalyzer</c>）。</summary>
+        public const string CmdAssembly = "CMD分析・アッセンブリ図";
+
+        /// <summary>【CMD 分析】阶段 B：读 02_要領図_部品機能情報.csv，挂在装配图名下（<c>CmdInstructionPartCollector</c>）。</summary>
+        public const string CmdYoryo = "CMD分析・要領図";
+
+        /// <summary>【CMD 分析】第 4 步：读 <c>classify\tz.json</c>（Excel 部品表），挂在装配图名下（<c>CmdTzPartCollector</c>）。</summary>
+        public const string CmdTz = "CMD分析・tz.json";
+
+        /// <summary>部品基本信息画面上手工追加的行。</summary>
+        public const string Manual = "手工追加";
+
+        /// <summary>全部取值（说明 / 下拉用）。</summary>
+        public static readonly string[] All =
+            new string[] { AiAnalysis, CmdAssembly, CmdYoryo, CmdTz, Manual };
+    }
+
+    /// <summary>
+    /// 部品基本信息的「来源标识」：<see cref="PartSourceKind"/> 的简称（同时作为写入数据库的文字）。
+    /// 用于在画面上一眼区分这一行的部品来自「要領図」还是「アッセンブリ図」自身的部品表。
+    /// </summary>
+    internal static class PartSourceTag
+    {
+        /// <summary>【AI 分析】（<see cref="PartSourceKind.AiAnalysis"/> 的简称）。</summary>
+        public const string AiAnalysis = "AI分析";
+
+        /// <summary>【CMD 分析】阶段 A：装配图自身的部品表（<see cref="PartSourceKind.CmdAssembly"/> 的简称）。</summary>
+        public const string CmdAssembly = "アッセンブリ図";
+
+        /// <summary>【CMD 分析】阶段 B：要領図 的部品（<see cref="PartSourceKind.CmdYoryo"/> 的简称）。</summary>
+        public const string CmdYoryo = "要領図";
+
+        /// <summary>【CMD 分析】第 4 步：Excel 部品表 tz.json 的部品（<see cref="PartSourceKind.CmdTz"/> 的简称）。</summary>
+        public const string CmdTz = "tz.json";
+
+        /// <summary>部品基本信息画面上手工追加的行（<see cref="PartSourceKind.Manual"/> 的简称）。</summary>
+        public const string Manual = "手工追加";
+
+        /// <summary>全部取值（说明 / 下拉用）。</summary>
+        public static readonly string[] All =
+            new string[] { AiAnalysis, CmdAssembly, CmdYoryo, CmdTz, Manual };
+
+        /// <summary>把「数据来源」（<see cref="PartSourceKind"/>）换成对应的「来源标识」；不认识的返回空。</summary>
+        public static string FromSourceKind(string sourceKind)
+        {
+            if (sourceKind == PartSourceKind.CmdYoryo)
+            {
+                return CmdYoryo;
+            }
+
+            if (sourceKind == PartSourceKind.CmdAssembly)
+            {
+                return CmdAssembly;
+            }
+
+            if (sourceKind == PartSourceKind.AiAnalysis)
+            {
+                return AiAnalysis;
+            }
+
+            if (sourceKind == PartSourceKind.Manual)
+            {
+                return Manual;
+            }
+
+            if (sourceKind == PartSourceKind.CmdTz)
+            {
+                return CmdTz;
+            }
+
+            return string.Empty;
+        }
     }
 }

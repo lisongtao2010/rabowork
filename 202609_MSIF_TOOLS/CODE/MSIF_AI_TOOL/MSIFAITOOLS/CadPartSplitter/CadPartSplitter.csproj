@@ -78,6 +78,7 @@
     <Compile Include="AssemblyYoryoBuilder.cs" />
     <Compile Include="DrawingListBuilder.cs" />
     <Compile Include="PdfInfo.cs" />
+    <Compile Include="TzJsonBuilder.cs" />
     <Compile Include="PdfInfoEditorForm.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -112,6 +113,13 @@
     <!-- PdfPig 只用于读取 PDF 文字层（文字内容 + 词框坐标），不参与渲染与分割 -->
     <PackageReference Include="PdfPig">
       <Version>0.1.9</Version>
+    </PackageReference>
+    <!--
+      只读 Excel（.xls / .xlsx / .xlsm）用的轻量库：tz.json 要读部品表的「カメラ」sheet。
+      不依赖机器上装没装 Excel，也没有传递依赖（net45 / netstandard2.0 组都是空的）。
+    -->
+    <PackageReference Include="ExcelDataReader">
+      <Version>3.6.0</Version>
     </PackageReference>
   </ItemGroup>
   <ItemGroup>

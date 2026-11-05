@@ -218,6 +218,19 @@ namespace CadPartSplitter
             totalWatch.Stop();
             LogSummary(options, results, totalWatch.ElapsedMilliseconds);
 
+            // 流水线最后一步：图纸文件夹里的 Excel 部品表 → <输出根目录>\classify\tz.json
+            // （整批共用一份，与 classify\PdfInfoList.txt 同目录；读「カメラ」sheet 的
+            //  品種 / 部品名 / 枠区分 / 部品コード / 追加対応特注寸法 五列）。
+            // 逐张处理完之后扫一次：同一批图纸的 Excel 只读一遍，不会每张图纸重写一次。
+            if (options.BuildTzJson)
+            {
+                TzJsonBuilder.Build(
+                    inputDir,
+                    PdfInfoListBuilder.GetClassifyDirectory(outputRoot, null),
+                    recursive,
+                    options);
+            }
+
             return results;
         }
 

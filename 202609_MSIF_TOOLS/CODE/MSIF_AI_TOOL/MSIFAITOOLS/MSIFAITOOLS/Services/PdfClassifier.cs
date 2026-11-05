@@ -304,6 +304,88 @@ namespace MSIFAITOOLS.Services
         }
 
         /// <summary>
+        /// 读取主清单（<c>&lt;输出根目录&gt;\classify\PdfInfoList.txt</c>）里指定「图面分类」的図番号，
+        /// 按清单顺序返回（去重）；「図番号」列为空时取「文件名」去掉扩展名。
+        /// <para>
+        /// 供【CMD 分析】遍历「図面分类 = アッセンブリ図」的记录用：清单存在但读不到表头
+        /// （缺「図番号 / 文件名」或「图面分类」列）时返回空列表，调用方自行退回一览数据。
+        /// </para>
+        /// </summary>
+        /// <param name="outputRoot">分解输出根目录（&lt;文件夹&gt;\AiAppData）。</param>
+        /// <param name="category">要筛选的图面分类（如 <see cref="PdfCategory.Assembly"/>）。</param>
+        public static List<string> ReadDrawingNumbers(string outputRoot, PdfCategory category)
+        {
+            List<string> numbers = new List<string>();
+            string path = GetInfoListPath(outputRoot);
+
+            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+            {
+                return numbers;
+            }
+
+            string[] lines;
+
+            try
+            {
+                lines = File.ReadAllLines(path, Encoding.UTF8);
+            }
+            catch (IOException)
+            {
+                return numbers;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return numbers;
+            }
+
+            if (lines.Length == 0)
+            {
+                return numbers;
+            }
+
+            List<string> header = ParseCsvLine(lines[0]);
+            int drawingNoIndex = IndexOfHeader(header, HeaderDrawingNo);
+            int fileNameIndex = IndexOfHeader(header, HeaderFileName);
+            int categoryIndex = IndexOfHeader(header, HeaderCategory);
+            int keyIndex = drawingNoIndex >= 0 ? drawingNoIndex : fileNameIndex;
+
+            if (keyIndex < 0 || categoryIndex < 0)
+            {
+                return numbers;
+            }
+
+            string categoryName = PdfCategoryNames.GetName(category);
+            HashSet<string> seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            for (int lineIndex = 1; lineIndex < lines.Length; lineIndex++)
+            {
+                List<string> fields = ParseCsvLine(lines[lineIndex]);
+
+                // 与 PdfCategoryNames.Parse 同一套文字，只认「图面分类」列原文等于该分类的行
+                if (!string.Equals(GetField(fields, categoryIndex).Trim(), categoryName, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                string key = GetField(fields, keyIndex).Trim();
+
+                if (drawingNoIndex < 0)
+                {
+                    key = Path.GetFileNameWithoutExtension(key);
+                }
+
+                if (key.Length == 0 || !seen.Add(key))
+                {
+                    continue;
+                }
+
+                numbers.Add(key);
+            }
+
+            return numbers;
+        }
+
+        /// <summary>
         /// 读取清单文件 → 以図番号为键的记录表；文件不存在或读取失败时返回 null。
         /// 列按表头名定位，所以四列主清单与列更多的单图清单都能读。
         /// </summary>

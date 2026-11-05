@@ -137,6 +137,8 @@ namespace MSIFAITOOLS.Services
 
             foreach (PartBasicInfo part in parts)
             {
+                part.SourceKind = PartSourceKind.AiAnalysis;
+                part.SourceTag = PartSourceTag.AiAnalysis;
                 part.SourceFile = pluTablePath;
                 part.PdfFile = pdfFilePath ?? string.Empty;
             }

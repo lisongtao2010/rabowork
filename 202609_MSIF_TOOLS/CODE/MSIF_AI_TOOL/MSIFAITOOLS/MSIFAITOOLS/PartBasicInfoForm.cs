@@ -186,6 +186,8 @@ namespace MSIFAITOOLS
                         part.PartCode,
                         status,
                         part.Remark,
+                        part.SourceKind,
+                        part.SourceTag,
                         part.LoginTime);
 
                     DataGridViewRow row = dgvParts.Rows[rowIndex];
@@ -202,7 +204,7 @@ namespace MSIFAITOOLS
         }
         /// <summary>
         /// 初始化部品明细表格的列（与 <see cref="PopulateParts"/> 的填充顺序一致）。
-        /// 除「No」「登录时间」以外均可编辑；「校验状态」为下拉选择。
+        /// 除「No」「数据来源」「来源标识」「登录时间」以外均可编辑；「校验状态」为下拉选择。
         /// </summary>
         private void InitializePartsGrid()
         {
@@ -221,11 +223,15 @@ namespace MSIFAITOOLS
             AddColumn("colPartCode", "部品コード", 102, DataGridViewContentAlignment.MiddleLeft, false);
             AddVerifyStatusColumn("colVerifyStatus", "校验状态", 88);
             AddColumn("colRemark", "备注", 170, DataGridViewContentAlignment.MiddleLeft, false);
+            // 数据来源 / 来源标识由程序写入，画面不可编辑
+            AddColumn("colSourceKind", "数据来源", 140, DataGridViewContentAlignment.MiddleCenter);
+            // 来源标识 = 数据来源的简称：要領図 / アッセンブリ図 / AI分析 / 手工追加
+            AddColumn("colSourceTag", "来源标识", 92, DataGridViewContentAlignment.MiddleCenter);
             AddColumn("colLoginTime", "登录时间", 130, DataGridViewContentAlignment.MiddleCenter);
         }
 
         /// <summary>添加一个文本列。</summary>
-        /// <param name="readOnly">true = 只读（No、登录时间等由程序维护的列）。</param>
+        /// <param name="readOnly">true = 只读（No、数据来源、来源标识、登录时间等由程序维护的列）。</param>
         private void AddColumn(string name, string headerText, int width,
             DataGridViewContentAlignment alignment, bool readOnly = true)
         {
@@ -315,6 +321,8 @@ namespace MSIFAITOOLS
                     string.Empty,
                     string.Empty,
                     PartVerifyStatus.NotChecked,
+                    string.Empty,
+                    string.Empty,
                     string.Empty,
                     string.Empty);
 
@@ -531,13 +539,17 @@ namespace MSIFAITOOLS
                 if (origin != null)
                 {
                     // 未修改的行沿用原来的来源与登录时间
+                    part.SourceKind = origin.SourceKind ?? string.Empty;
+                    part.SourceTag = origin.SourceTag ?? string.Empty;
                     part.SourceFile = origin.SourceFile ?? string.Empty;
                     part.PdfFile = string.IsNullOrEmpty(origin.PdfFile) ? _pdfPath : origin.PdfFile;
                     part.LoginTime = origin.LoginTime ?? string.Empty;
                 }
                 else
                 {
-                    // 新追加的行：登录时间留空，由仓储写入当前时间
+                    // 新追加的行：来源 = 手工追加；登录时间留空，由仓储写入当前时间
+                    part.SourceKind = PartSourceKind.Manual;
+                    part.SourceTag = PartSourceTag.Manual;
                     part.SourceFile = string.Empty;
                     part.PdfFile = _pdfPath;
                     part.LoginTime = string.Empty;

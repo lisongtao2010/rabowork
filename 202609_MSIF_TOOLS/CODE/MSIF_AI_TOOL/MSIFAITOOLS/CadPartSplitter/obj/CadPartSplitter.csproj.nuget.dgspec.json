@@ -49,6 +49,10 @@
               "target": "Package",
               "version": "[2.6.0, )"
             },
+            "ExcelDataReader": {
+              "target": "Package",
+              "version": "[3.6.0, )"
+            },
             "OpenCvSharp4": {
               "target": "Package",
               "version": "[4.10.0.20240616, )"
