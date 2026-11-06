@@ -22,6 +22,8 @@ SQLite 表**（`PartBasicInfoRepository.TableName`）。
 并拆成多条；**第 3 步 要領図部品追加** —— 把各要領図里「品種与分类依据相符」的部品行、以及**没有品種（所有品種共用）**
 的部品行一并挂到该装配图名下；**第 4 步 tz.json 部品追加** —— 读 Excel 部品表 `classify\tz.json`，
 把「品種」与分类依据相符的明细（部品名 / 枠区分 / 部品コード / 特注寸法）也挂到该装配图名下。
+第 1 步还会顺便填「部材名」：用「番号」找到圈号所在的零件图，把该零件图的 `texts` 去掉**含数字**的文字、
+去掉 **`XX部`** 形式的位置标记，剩下的去重后用 `|` 连接（例：番号 4 → `縦枠`；两图各部材 → `鴨居|上レール`）。
 入库方式、校验状态、部品信息画面的显示方式与 AI 分析一致。
 
 ### 步骤速查（详细说明见 [CMD分析_步骤命名.md](CMD分析_步骤命名.md)）
@@ -29,7 +31,7 @@ SQLite 表**（`PartBasicInfoRepository.TableName`）。
 | 步 | 代号 | 名字 | 旧称 | 做什么 |
 | --- | --- | --- | --- | --- |
 | 0 | `S0` | 分解与分类 | —（按钮外） | 【开始分解】：CadPartSplitter + 本工具分解 + `classify\PdfInfoList.txt` |
-| 1 | `S1` | 装配图部品入库 | 阶段 A | 读 `01_アッセンブリ図_部品機能情報.csv` → 建行 → `xy.txt` 校验 → 入库 |
+| 1 | `S1` | 装配图部品入库 | 阶段 A | 读 `01_アッセンブリ図_部品機能情報.csv` → 建行 → `xy.txt` 校验 → 部材名 → 入库 |
 | 2 | `S2` | 圈号拆分 | 阶段 A2 | 按 `parts_info.json` 的圈号把装配图部品按位置拆成多条 |
 | 3 | `S3` | 要領図部品追加 | 阶段 B | 读 `01_アッセンブリ図_要領図.csv` → 各 `02_要領図_部品機能情報.csv` → 追加建行 |
 | 4 | `S4` | tz.json 部品追加 | — | 读 `classify\tz.json` → 「品種」命中分类依据的明细 → 追加建行 |
@@ -69,7 +71,7 @@ SQLite 表**（`PartBasicInfoRepository.TableName`）。
 | `<根>\<図番>\xy.txt` | 文字坐标，用于交叉校验部品是否真的出现在图上（不存在则跳过校验） |
 | `<根>\<図番>\01_アッセンブリ図_要領図.csv` | 该装配图引用的要領図 清单（項目 / 要領図漢字 / 図番） |
 | `<根>\<要領図図番>\02_要領図_部品機能情報.csv` | 要領図 的部品明细（品種 / 部品名 / 枠区分 / 部品コード / 員数）；旧名 `LT_STEP2.csv` 兜底 |
-| `<根>\<図番>\parts_info.json` | CadPartSplitter 的零件信息（零件框 + 文字 + 坐标）。`texts[]` 里的「A部 / F部 …」位置标记（第 3 步用）与 `callouts[]` 里的圈号 `text=4` / `display=④4`（第 2 步用）都用来给部品名加「右 / 左」「上 / 下」——只认 `index` 不同、且这些零件图的 `texts` 互为包含的零件图 |
+| `<根>\<図番>\parts_info.json` | CadPartSplitter 的零件信息（零件框 + 文字 + 坐标）。`texts[]` 里的「A部 / F部 …」位置标记（第 3 步用）与 `callouts[]` 里的圈号 `text=4` / `display=④4`（第 2 步用）都用来给部品名加「右 / 左」「上 / 下」——只认 `index` 不同、且这些零件图的 `texts` 互为包含的零件图；第 1 步还用 `callouts` 定位圈号所在的零件图、按其 `texts` 生成「部材名」 |
 | `<根>\classify\tz.json` | Excel 部品表转成的 JSON（品種 / 部品名 / 枠区分 / 部品コード / 追加対応特注寸法），第 4 步用 |
 | `<根>\classify\PdfInfoList.txt` | 分类清单（図番号 / 文件名 / 图面分类 / 分类依据）；第 4 步从这里取「分类依据」与 tz.json 的「品種」比对 |
 
@@ -83,10 +85,41 @@ SQLite 表**（`PartBasicInfoRepository.TableName`）。
 老数据库（本版本之前建的表）打开时自动
 `ALTER TABLE … ADD COLUMN` 补上该列，并按「来源表格文件」把老数据回填一次。
 
-**「来源标识」列**（`PartSourceTag`，数据库列名同为「来源标识」）：上者的**简称**，用于在部品基本信息
-画面上一眼区分这行部品来自**要領図**、**アッセンブリ図**本身的部品表、还是 **tz.json** ——
-第 1 步写 `アッセンブリ図`、第 3 步（要領図）写 `要領図`、第 4 步写 `tz.json`、【AI 分析】写 `AI分析`、手工追加写 `手工追加`。
-同样是后加的列，老库打开时自动补列并回填（先按「数据来源」换算，`数据来源` 为空的再按「来源表格文件」推断）。
+**「参照元」列**（数据库列名 = **参照元**，旧名「来源标识」）：**值 = 该行的「図番」**。
+写库时统一由 `PartBasicInfoRepository.BindInsertParameters` 填成「図番」（只有図番为空时才退回原来的来源简称）；
+`PartBasicInfo.SourceTag` 在内存里仍然是 要領図 / アッセンブリ図 / tz.json / AI分析 / 手工追加 这些简称，
+但**不再写进这一列** —— 想知道这行是哪个功能写的，看「数据来源」列。
+老数据库打开时 `PartBasicInfoRepository.NormalizeReferenceColumns` 会把不等于「図番」的旧值一并改成「図番」；
+列名由「来源标识」改成「参照元」时只改名（`ALTER TABLE … RENAME COLUMN`），**原有数据保留**（随后同样被对齐成「図番」）。
+
+**「部材名」列**（`PartBasicInfo.MemberName`，数据库列名同为「部材名」）：第 1 步入库时用行上的
+**「番号」**到该页 `parts_info.json` 的 `callouts` 里找圈号（`"text": "4"` + `"display": "④4"`，
+与第 2 步同一套判定），取该圈号所在零件图（`index`）的**全部 `texts`**：
+去掉**含数字**的文字（圈号 / 尺寸 / 図番）、去掉 **`XX部`** 形式的位置标记（`A部` / `M部` / `N部`），
+剩下的**去重**后用 `|` 连接。例：`H310U10004` 的番号 4 命中 index 2 / 3 两张零件图，
+texts 为 `4 / 9.73 / N部 / A部 / M部 / 縦枠` → 部材名 = `縦枠`；两张图各有不同部材时是 `鴨居|上レール`。
+第 2 步拆出来的行**沿用原行的部材名**；第 3 / 4 步的行、AI 分析行、手工追加行的「番号」不是图纸圈号，
+所以算不出部材名 —— **写库时统一填「その他」**（`PartBasicInfo.MemberNameFallback`，
+由 `PartBasicInfoRepository.BindInsertParameters` 套用；老库打开时 `NormalizeReferenceColumns`
+把空值也补成「その他」）。同样是后加的列：老库打开时自动补列（`PartBasicInfoRepository.EnsureColumn`），
+历史数据这一次只补「その他」，算得出来的部材名仍要重跑一次第 1 步。
+
+**部品基本信息表的列**（`PartBasicInfoRepository.ColumnNames`；顺序 = 新建库的列顺序 = 画面显示顺序）：
+前 14 列是业务必需列 —— `番号 / 部材名 / 部品名 / 区分 / 数量 / 切断寸法 / 部品コード / 参照元 /
+H下限 / H上限 / W下限 / W上限 / 使い分け / 特注`；其后是辅助列 ——
+`図番 / 页码 / 部品図番 / 基本寸法 / 校验状态 / 备注 / 数据来源 / 来源表格文件 / 来源PDF / 登录时间`。
+
+- **老库列名升级**：`枠区分 → 区分`、`員数 → 数量`、`来源标识 → 参照元`
+  （`PartBasicInfoRepository.MigrateLegacyColumn`：`ALTER TABLE … RENAME COLUMN` 只改名、数据保留；
+  SQLite 太老不支持改名时退回「加新列 + 复制数据」）。
+- **后加的列**：`部材名` / `H下限` / `H上限` / `W下限` / `W上限` / `使い分け` / `特注`
+  （`EnsureColumn` 打开老库时自动补上，历史数据不回填）。
+- **谁来填**：`特注` = 第 4 步 tz.json 的明细一律写 `1`；`H下限 / H上限 / W下限 / W上限` = 第 4 步按
+  「追加対応特注寸法」自动解析（`2199 ≦Ｗ` → W下限 2199 / W上限 9999，只写一边时另一边固定 9999・0）；
+  `使い分け` 目前没有自动数据源（图纸「特寸時使い分け表」里的品種），先留空、由画面手工填。
+- **参照元 / 部材名的固定规则**：`参照元` 一律写该行的「図番」；`部材名` 为空时一律写 `その他`
+  （都在 `PartBasicInfoRepository.BindInsertParameters` 里统一处理，AI 分析 / CMD 4 步 / 手工追加 全都适用；
+  老数据由 `NormalizeReferenceColumns` 在打开数据库时对齐）。
 
 ## 4. 执行流程
 
@@ -108,14 +141,18 @@ SQLite 表**（`PartBasicInfoRepository.TableName`）。
    同一「页码 + 番号 + 部品コード」只保留一条（「下表参照」展开后完全相同的情况）。
 4. **坐标校验**：读 `xy.txt` 建索引（`PartCoordinateVerifier`），逐行核对部品是否在图面文字里，
    结果写入 `PartVerifyStatus`（Passed / Failed），并在日志里输出一致 / 不符的条数。
-5. **入库**：`PartBasicInfoRepository.Save(図番, parts)` —— 该図番原有行先删后插（整张覆盖），
+5. **部材名**：用「番号」到该页 `parts_info.json` 的 `callouts` 里找圈号（`text` + `display` 自洽），
+   取该圈号所在零件图的全部 `texts`，去掉含数字的文字、去掉 `XX部` 形式的位置标记，去重后用 `|` 连接，
+   写入「部材名」（`PartsInfoIndex.ResolveCalloutMemberName`）。番号不是圈号 / 读不到 json 时留空，
+   不影响入库；日志里会多一行 `  部材名：N 行按「番号 → 圈号 → 零件图 texts」取自 parts_info.json`。
+6. **入库**：`PartBasicInfoRepository.Save(図番, parts)` —— 该図番原有行先删后插（整张覆盖），
    因此同一份数据重复执行不会翻倍。每行的「数据来源」写 `CMD分析・アッセンブリ図`、
-   「来源标识」写 `アッセンブリ図`。
+   「参照元」写该行的「図番」（来源分类看「数据来源」）。
 
 ### 阶段 A2：按圈号分割部品（`CmdCalloutPartSplitter`）
 
 対象図番来自 `classify\PdfInfoList.txt` 里「图面分类 = アッセンブリ図」的记录（清单读不到时退回一览），
-再取该 図番 在部品基本信息表里的行，**只处理「来源标识 = アッセンブリ図」的行**（阶段 A 登录的行）：
+再取该 図番 在部品基本信息表里的行，**只处理「数据来源 = CMD分析・アッセンブリ図」的行**（阶段 A 登录的行）：
 
 1. **找圈号**：用行上的「番号」到该页目录的 `<根>\<図番>\parts_info.json`（第 2 页起 `<図番>_P2\`）里
    找 `callouts[]`，要求 `text`、`display`、`no` **三者自洽** —— 番号 4 必须命中
@@ -182,12 +219,12 @@ SQLite 表**（`PartBasicInfoRepository.TableName`）。
    | 番号 | 接在已有行最大番号之后连续编号 |
    | 部品名 / 部品コード | 取自 02 文件（部品名可能带「右 / 左」「上 / 下」位置前缀，见本节第 4 点） |
    | 部品図番 | 要領図 的図番 |
-   | 枠区分 | 取自 02 的枠区分列（単純部品表 / 普通部品表转来的 02 有该列；品種表转来的没有，留空） |
-   | 員数 | 取自 02 的員数列（基本寸法 / 切断寸法 留空） |
-   | 備注 | `品種：<品種>；項目：<項目>`（項目 来自 01 要領図 清单，多个时 `A / M`；品種为空时写 `品種：共通`） |
+   | 区分 | 取自 02 的枠区分列（単純部品表 / 普通部品表转来的 02 有该列；品種表转来的没有，留空） |
+   | 数量 | 取自 02 的員数列（基本寸法 / 切断寸法 留空） |
+   | 备注 | `品種：<品種>；項目：<項目>`（項目 来自 01 要領図 清单，多个时 `A / M`；品種为空时写 `品種：共通`） |
    | 校验状态 | `PartVerifyStatus.NotChecked`（要領図行不做坐标校验） |
    | 数据来源 | `PartSourceKind.CmdYoryo`（`CMD分析・要領図`） |
-   | 来源标识 | `PartSourceTag.CmdYoryo`（`要領図`） |
+   | 参照元 | 写库时统一填该行的「図番」（`PartSourceTag.CmdYoryo` 只留在内存对象上，不写进这一列） |
    | 来源 | `SourceFile` = 02 文件路径，`PdfFile` = 装配图 PDF 路径 |
 
 7. **再次入库**（幂等的关键）：先 `repository.Query(図番)` 取出该図番已有行，
@@ -205,6 +242,9 @@ tz.json 是 Excel 部品表转成的 JSON，每行含 `品種` / `部品名` / `
    （全角转半角、去空白、忽略大小写）；整词一个都不命中时才退回**包含**比较
    （日志 `tz.json：品種命中 N 条（命中品種 …，按包含比较命中）`）。
 3. **丢弃规则**：`品種` 为空的行跳过（tz.json 没有「共通部品」的概念，日志 `没有品種的明细 N 条`）；
+   明细里写着 **`追加不要`**（`追加しない` / `追加なし` / `追加無し` 也算；品種 / 部品名 / 枠区分 /
+   部品コード / 追加対応特注寸法 任一处出现即算，忽略全角与空白）→ **整条不追加到部品基本信息**
+   （`CmdTzPartCollector.NoNeedMarks`，日志 `明细写着「追加不要」N 条，没有追加到部品基本信息`）；
    `部品コード` 必须含英文字母（`IsValidPartCode`，空 / 纯数字跳过）；
    同一 `品種 + 部品名 + 部品コード` 只取一条。
 4. **生成行的规则**：
@@ -214,15 +254,17 @@ tz.json 是 Excel 部品表转成的 JSON，每行含 `品種` / `部品名` / `
    | 図番 | アッセンブリ図 的図番（挂在装配图名下） |
    | 页码 | 固定 1 |
    | 番号 | 接在已有行最大番号之后连续编号 |
-   | 部品名 / 部品コード / 枠区分 | 取自 tz.json（員数 / 基本寸法 / 切断寸法 / 部品図番 留空） |
+   | 部品名 / 部品コード / 区分 | 取自 tz.json（数量 / 基本寸法 / 切断寸法 / 部品図番 留空） |
+   | 特注 | 固定 `1`（`CmdTzPartCollector.SpecialNoteMark`：tz.json 的明细都是「追加対応」部品） |
+   | H下限 / H上限 / W下限 / W上限 | 由 `追加対応特注寸法` 自动解析（`ApplySpecialSize`）：`2199 ≦Ｗ` → W下限 `2199` / W上限 `9999`（只写一边时另一边固定 9999・0）；`Ｗ ≦ 2199` → W下限 `0` / W上限 `2199`；`1800 ≦Ｗ ≦ 2000` 两端都取；`＜` 按开区间各让 1；`≦Ｈ` 写进 H下限 / H上限；认不出的写法留空 |
    | 备注 | `品種：<品種>；特注寸法：<追加対応特注寸法>`（没有特注寸法时只写 `品種：…`） |
    | 校验状态 | `PartVerifyStatus.NotChecked`（tz 行不做坐标校验） |
    | 数据来源 | `PartSourceKind.CmdTz`（`CMD分析・tz.json`） |
-   | 来源标识 | `PartSourceTag.CmdTz`（`tz.json`） |
+   | 参照元 | 写库时统一填该行的「図番」（`PartSourceTag.CmdTz` 只留在内存对象上，不写进这一列） |
    | 来源 | `SourceFile` = `classify\tz.json` 路径，`PdfFile` = 装配图 PDF 路径 |
 
 5. **再次入库**（幂等的关键）：先 `repository.Query(図番)` 取出该図番已有行，
-   用 `IsTzRow`（`来源标识 = tz.json`）**剔除上次本步写入的行**，保留第 1 / 2 / 3 步的行，
+   用 `IsTzRow`（`数据来源 = CMD分析・tz.json`）**剔除上次本步写入的行**，保留第 1 / 2 / 3 步的行，
    再合并本次 tz.json 行后 `Save`（先删后插）→ 重复点按钮不会产生重复行，也不会冲掉其他步骤的行。
    合并结果为空（该図番原本只有 tz 行、这次一条都不再命中）时改调 `ReplaceByDrawing` 把该図番清空
    ——`Save` 收到空表会直接返回、不清库，所以这一支必须单独处理。
@@ -255,7 +297,8 @@ tz.json 是 Excel 部品表转成的 JSON，每行含 `品種` / `部品名` / `
 - 第 4 步：`【第 4 步 · tz.json 部品追加】读 PdfInfoList.txt（图面分类 = 「アッセンブリ図」的记录，取分类依据）→ tz.json 中「品種」命中分类依据的明细挂到「アッセンブリ図」上`
   → `tz.json：N 条明细 / 清单里「アッセンブリ図」K 条` →
   `tz.json：品種命中 x 条（命中品種 …）` / `tz.json：品種（…）都不在分类依据里，跳过` →
-  `tz.json：没有品種的明细 k 条（无法比对分类依据），已跳过` / `tz.json：部品コード 为空 / 无效（不含英文字母）k 条，已跳过` →
+  `tz.json：没有品種的明细 k 条（无法比对分类依据），已跳过` / `tz.json：部品コード 为空 / 无效（不含英文字母）k 条，已跳过` /
+  `tz.json：明细写着「追加不要」k 条，没有追加到部品基本信息` →
   `tz.json 部品登录：x 条（図番 …；该図番合计 y 行）`（重跑时多一段 `，已剔除上次 tz 行 k 条`）/
   `没有需要追加的 tz.json 部品`
 - 结束时一行汇总（同时用于状态栏与完成对话框）：
@@ -275,7 +318,7 @@ SplitRowCount（按圈号分割新增的行）/ SplitGroupCount（被分割的�
 ## 6. 幂等性与容错
 
 - **幂等**：第 1 步按図番整张覆盖写；第 2 步只拆备注里还没有 `位置：` 的行；第 3 步先剔除上次追加行再合并写；
-  第 4 步先剔除上次写入的 `来源标识 = tz.json` 行再合并写 → 反复执行结果稳定。
+  第 4 步先剔除上次写入的 `数据来源 = CMD分析・tz.json` 行再合并写 → 反复执行结果稳定。
 - **缺文件不中断**：缺 01 csv / 01 要領図 清单 / 某个 02 文件时，只记一条提示并累加缺失数，
   其它 PDF 继续。
 - **单文件异常隔离**：每个 PDF 的分析包在 try/catch 里，异常计入「失败」并输出错误日志，
@@ -319,11 +362,13 @@ SplitRowCount（按圈号分割新增的行）/ SplitGroupCount（被分割的�
     不提示、不报错，部品名与以前完全一样。位置标记只认**不同 `index` 的零件图**（同一张图里出现多次算一处），
     且这些零件图的全部 `texts` 必须整体构成 `A ⊆ B` / `B ⊆ A` 的包含关系，不满足时同样不加前缀
     （日志会写明 `但零件图（index …）的文字互不包含`）。
-11. 「数据来源」「来源标识」都是**后加的列**：老数据库第一次被打开时自动补上
+11. 「数据来源」「参照元」都是**后加的列**：老数据库第一次被打开时自动补上
     （`PartBasicInfoRepository.EnsureColumn`），并回填一次 ——
     「数据来源」按「来源表格文件」推断（`02_要領図_…` → 要領図、`01_アッセンブリ図_…` → アッセンブリ図、
-    `plu_table.txt` → AI 分析）；「来源标识」先按「数据来源」换算，仍为空的再按同一条文件规则兜底。
-    认不出来的（手工录入等）保持空。
+    `plu_table.txt` → AI 分析），认不出来的（手工录入等）保持空；
+    「参照元」**不是来源标识，而是该行的「図番」** —— 每次打开数据库都由
+    `NormalizeReferenceColumns` 统一成「図番」（更早的版本里这一列叫「来源标识」、存的是来源简称，
+    打开老库时先由 `MigrateLegacyColumn` 改名、数据保留，随后被同一句 UPDATE 覆盖成「図番」）。
 12. **第 2 步只认 `parts_info.json` 的 `callouts`**：老分解结果没有 `callouts`、或圈号的
     `text` / `display` / `no` 三者对不上时**不分割**，部品名原样（日志里也不提示，避免噪音）。
     另外 `callouts` 里的 `pdf_mm` 是**圆心** `cx / cy`，不是文字框的 `x / y / w / h`。
@@ -337,6 +382,19 @@ SplitRowCount（按圈号分割新增的行）/ SplitGroupCount（被分割的�
     `なし` 等占位符时同样算共通），日志里与「品種命中」分开计数
     （`品種命中 x 行 + 无品種（共通）y 行`）；同一部品既有品種行又有共通行时各留一条
     （去重键不同：`<品種>#名#码` 与 `#共通#名#码`）。
+16. **「部材名」只有第 1 步会算、第 2 步拆条时复制**：番号是接续编号的第 3 / 4 步行、AI 分析行、
+    手工追加行算不出部材名（它们的番号不是图纸圈号，硬套会取到别人的文字），
+    写库时统一填「その他」（`PartBasicInfo.MemberNameFallback`），画面上不会出现空的部材名。
+    过滤规则是「**含数字的文字**整条丢弃」（`9.73`、`1HW2…` 这类尺寸 / 型番不会进部材名）、
+    「**以「部」结尾**的文字整条丢弃」（`A部` / `M部` / `N部` 是位置标记）。
+    同一张零件图上重复出现的文字只留一条，两张零件图共有同一文字也只留一条。
+17. **第 4 步的 特注 / H・W 界限**：`特注` 列对 tz.json 行一律写 `1`（`SpecialNoteMark`，代表这行是
+    「追加対応」部品），特注寸法原文只留在备注里；`H下限 / H上限 / W下限 / W上限` 由「追加対応特注寸法」
+    解析（`ApplySpecialSize`）：只写 `<数字> ≦Ｗ` 时 `W下限 = 数字`、`W上限 = 9999`（固定，`SpecialSizeOpenUpper`）；
+    只写 `Ｗ ≦ <数字>` 时 `W下限 = 0`（固定）・`W上限 = 数字`；两端都写则都取，`＜` 按开区间各让 1；
+    `Ｈ` 同理写进 H 侧；认不出的写法（没有数字 / 没有 Ｈ・Ｗ）留空。
+    明细里写着「追加不要」（`追加しない` / `追加なし` / `追加無し` 也算）**整条不追加**。
+
 
 ## 9. 代码位置索引
 
@@ -348,11 +406,13 @@ SplitRowCount（按圈号分割新增的行）/ SplitGroupCount（被分割的�
 | 按圈号（`callouts`）分割部品、方向前缀、拆条写回 | `Services/CmdCalloutPartSplitter.cs` → `Split`；判定复用 `PartsInfoIndex.ResolveCalloutSplit` / `BuildSplitPlan` |
 | 01 csv 定位 / 列名映射 / 去重 / 坐标校验 | `Services/CmdPartAnalyzer.cs` → `LocateSources` / `Analyze` |
 | 要領図 清单 → 02 文件 → 品種匹配（含无品種共通行）→ 建行 | `Services/CmdInstructionPartCollector.cs` → `Collect` / `CollectFromYoryoParts` |
-| tz.json 明细读取 / 品種匹配 / 去重 / 建行 | `Services/CmdTzPartCollector.cs` → `ReadAssemblyEvidence` / `LoadEntries` / `Collect` |
+| tz.json 明细读取 / 品種匹配 / 去重 / 建行 / 特注=1・H/W 界限 / 追加不要跳过 | `Services/CmdTzPartCollector.cs` → `ReadAssemblyEvidence` / `LoadEntries` / `Collect` / `ApplySpecialSize` / `IsNoNeedEntry` |
 | parts_info.json 标记索引（排列判定 / 位置前缀） | `Services/PartsInfoIndex.cs` → `Load` / `ResolveSplit`；调用处 `CmdInstructionPartCollector.LoadPartsInfo` / `BuildItemMark` |
 | 文件名常量（含旧名兜底） | `CmdPartAnalyzer.LtStep1FileName` / `LegacyLtStep1FileName`；`CmdInstructionPartCollector.YoryoListFileName` / `YoryoPartFileName` / `LegacyYoryoPartFileName` |
 | 目标筛选与汇总数据结构 | `Services/PartAnalysisService.cs` → `SelectAssemblyTargets` / `PartAnalysisSummary` |
+| 部材名（番号 → 圈号 → 零件图 texts，去掉数字 / `XX部` 后用竖线连接；为空时写库统一填「その他」） | `Services/PartsInfoIndex.cs` → `ResolveCalloutMemberName`；写入 `CmdPartAnalysisService.ApplyMemberNames`；DB 列「部材名」= `PartBasicInfoRepository.MemberNameColumnName`；空值兜底 `PartBasicInfo.MemberNameFallback` / `PartBasicInfoRepository.ResolveMemberName`（老数据 `NormalizeReferenceColumns`）；画面列 `colMemberName`（`PartBasicInfoForm.InitializePartsGrid`） |
 | 入库（先删后插） | `Services/PartBasicInfoRepository.cs` → `Save` / `Query` |
 | 数据来源取值（AI分析 / CMD分析・アッセンブリ図 / CMD分析・要領図 / CMD分析・tz.json / 手工追加） | `Services/PartBasicInfo.cs` → `PartSourceKind`；DB 列「数据来源」= `PartBasicInfoRepository.SourceKindColumnName`；画面列 `colSourceKind`（`PartBasicInfoForm.InitializePartsGrid`） |
-| 来源标识取值（AI分析 / アッセンブリ図 / 要領図 / tz.json / 手工追加） | `Services/PartBasicInfo.cs` → `PartSourceTag`（`FromSourceKind` 做换算）；DB 列「来源标识」= `PartBasicInfoRepository.SourceTagColumnName`；画面列 `colSourceTag`（`PartBasicInfoForm.InitializePartsGrid`） |
+| 参照元（**写库一律 = 该行的「図番」**；内存里的来源简称见 `PartSourceTag`：AI分析 / アッセンブリ図 / 要領図 / tz.json / 手工追加） | `Services/PartBasicInfo.cs` → `PartBasicInfo.SourceTag` / `PartSourceTag`（`FromSourceKind` 做换算）；DB 列「参照元」= `PartBasicInfoRepository.SourceTagColumnName`（旧名「来源标识」= `LegacySourceTagColumnName`），写库 `BindInsertParameters`、老数据对齐 `NormalizeReferenceColumns`；画面列 `colSourceTag`（表头「参照元」） |
+| 必需列 / 列名升级（区分 / 数量 / 参照元 改名；H下限 / H上限 / W下限 / W上限 / 使い分け / 特注 新增） | `Services/PartBasicInfoRepository.cs` → `ColumnNames` / `FrameKindColumnName` / `QuantityColumnName` / `HeightMinColumnName` … `SpecialNoteColumnName` / `MigrateLegacyColumn` / `EnsureColumn` / `BindInsertParameters` / `NormalizeReferenceColumns`；画面列 `colHeightMin` / `colHeightMax` / `colWidthMin` / `colWidthMax` / `colUsageKind` / `colSpecialNote`（`PartBasicInfoForm.InitializePartsGrid`） |
 

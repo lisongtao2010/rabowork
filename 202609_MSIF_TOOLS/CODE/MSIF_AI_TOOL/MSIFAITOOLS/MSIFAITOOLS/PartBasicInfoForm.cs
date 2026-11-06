@@ -174,21 +174,28 @@ namespace MSIFAITOOLS
                         : PartVerifyStatus.NotChecked;
 
                     int rowIndex = dgvParts.Rows.Add(
-                        (index + 1).ToString(),
-                        part.Page.ToString(),
-                        part.Number.ToString(),
-                        part.PartName,
-                        part.PartDrawingNo,
-                        part.FrameKind,
-                        part.Quantity,
-                        part.BasicSize,
-                        part.CutSize,
-                        part.PartCode,
-                        status,
-                        part.Remark,
-                        part.SourceKind,
-                        part.SourceTag,
-                        part.LoginTime);
+                        part.Number.ToString(),     // 番号
+                        part.MemberName,            // 部材名
+                        part.PartName,              // 部品名
+                        part.FrameKind,             // 区分
+                        part.Quantity,              // 数量
+                        part.CutSize,               // 切断寸法
+                        part.PartCode,              // 部品コード
+                        part.SourceTag,             // 参照元
+                        part.HeightMin,             // H下限
+                        part.HeightMax,             // H上限
+                        part.WidthMin,              // W下限
+                        part.WidthMax,              // W上限
+                        part.UsageKind,             // 使い分け
+                        part.SpecialNote,           // 特注
+                        part.Page.ToString(),       // 页码
+                        part.PartDrawingNo,         // 部品図番
+                        part.BasicSize,             // 基本寸法
+                        status,                     // 校验状态
+                        part.Remark,                // 备注
+                        part.SourceKind,            // 数据来源
+                        part.LoginTime,             // 登录时间
+                        (index + 1).ToString());    // No
 
                     DataGridViewRow row = dgvParts.Rows[rowIndex];
                     row.Tag = part;
@@ -204,34 +211,50 @@ namespace MSIFAITOOLS
         }
         /// <summary>
         /// 初始化部品明细表格的列（与 <see cref="PopulateParts"/> 的填充顺序一致）。
-        /// 除「No」「数据来源」「来源标识」「登录时间」以外均可编辑；「校验状态」为下拉选择。
+        /// 前 14 列是业务必需列，按「番号 / 部材名 / 部品名 / 区分 / 数量 / 切断寸法 / 部品コード /
+        /// 参照元 / H下限 / H上限 / W下限 / W上限 / 使い分け / 特注」的顺序优先显示，其余为辅助列。
+        /// 除「No」「参照元」「数据来源」「登录时间」以外均可编辑；「校验状态」为下拉选择。
         /// </summary>
         private void InitializePartsGrid()
         {
             dgvParts.AutoGenerateColumns = false;
             dgvParts.Columns.Clear();
 
-            AddColumn("colNo", "No", 40, DataGridViewContentAlignment.MiddleCenter);
-            AddColumn("colPage", "页码", 46, DataGridViewContentAlignment.MiddleCenter, false);
+            // ── 业务必需列（优先显示）─────────────────────────────────────
             AddColumn("colNumber", "番号", 46, DataGridViewContentAlignment.MiddleCenter, false);
+            // 部材名：用「番号」在 parts_info.json 的 callouts 里找圈号后，取该圈号所在零件图的
+            // texts（去掉数字、去掉「XX部」）用 | 连接；程序自动填，也允许在画面上修正
+            AddColumn("colMemberName", "部材名", 120, DataGridViewContentAlignment.MiddleLeft, false);
             AddColumn("colPartName", "部品名", 170, DataGridViewContentAlignment.MiddleLeft, false);
-            AddColumn("colPartDrawingNo", "部品図番", 118, DataGridViewContentAlignment.MiddleLeft, false);
-            AddColumn("colFrameKind", "枠区分", 66, DataGridViewContentAlignment.MiddleCenter, false);
-            AddColumn("colQuantity", "員数", 56, DataGridViewContentAlignment.MiddleCenter, false);
-            AddColumn("colBasicSize", "基本寸法", 100, DataGridViewContentAlignment.MiddleLeft, false);
+            AddColumn("colFrameKind", "区分", 66, DataGridViewContentAlignment.MiddleCenter, false);
+            AddColumn("colQuantity", "数量", 56, DataGridViewContentAlignment.MiddleCenter, false);
             AddColumn("colCutSize", "切断寸法", 100, DataGridViewContentAlignment.MiddleLeft, false);
             AddColumn("colPartCode", "部品コード", 102, DataGridViewContentAlignment.MiddleLeft, false);
+            // 参照元 = 该行的「図番」（写库时统一由 PartBasicInfoRepository.BindInsertParameters 填成図番，
+            // 老数据库打开时也会把旧值改成図番），画面只读；来源分类看后面的「数据来源」列
+            AddColumn("colSourceTag", "参照元", 92, DataGridViewContentAlignment.MiddleCenter);
+            AddColumn("colHeightMin", "H下限", 64, DataGridViewContentAlignment.MiddleCenter, false);
+            AddColumn("colHeightMax", "H上限", 64, DataGridViewContentAlignment.MiddleCenter, false);
+            AddColumn("colWidthMin", "W下限", 64, DataGridViewContentAlignment.MiddleCenter, false);
+            AddColumn("colWidthMax", "W上限", 64, DataGridViewContentAlignment.MiddleCenter, false);
+            AddColumn("colUsageKind", "使い分け", 96, DataGridViewContentAlignment.MiddleLeft, false);
+            AddColumn("colSpecialNote", "特注", 120, DataGridViewContentAlignment.MiddleLeft, false);
+
+            // ── 辅助列 ───────────────────────────────────────────────────
+            AddColumn("colPage", "页码", 46, DataGridViewContentAlignment.MiddleCenter, false);
+            AddColumn("colPartDrawingNo", "部品図番", 118, DataGridViewContentAlignment.MiddleLeft, false);
+            AddColumn("colBasicSize", "基本寸法", 100, DataGridViewContentAlignment.MiddleLeft, false);
             AddVerifyStatusColumn("colVerifyStatus", "校验状态", 88);
             AddColumn("colRemark", "备注", 170, DataGridViewContentAlignment.MiddleLeft, false);
-            // 数据来源 / 来源标识由程序写入，画面不可编辑
+            // 数据来源 = 这行是哪个功能写的（CMD分析・アッセンブリ図 / CMD分析・要領図 / CMD分析・tz.json / AI分析 / 手工追加），由程序写入，画面不可编辑
             AddColumn("colSourceKind", "数据来源", 140, DataGridViewContentAlignment.MiddleCenter);
-            // 来源标识 = 数据来源的简称：要領図 / アッセンブリ図 / AI分析 / 手工追加
-            AddColumn("colSourceTag", "来源标识", 92, DataGridViewContentAlignment.MiddleCenter);
             AddColumn("colLoginTime", "登录时间", 130, DataGridViewContentAlignment.MiddleCenter);
+            // No = 画面行号（追加 / 删除行后自动重排），放在最后不占必需列的位置
+            AddColumn("colNo", "No", 40, DataGridViewContentAlignment.MiddleCenter);
         }
 
         /// <summary>添加一个文本列。</summary>
-        /// <param name="readOnly">true = 只读（No、数据来源、来源标识、登录时间等由程序维护的列）。</param>
+        /// <param name="readOnly">true = 只读（No、参照元、数据来源、登录时间等由程序维护的列）。</param>
         private void AddColumn(string name, string headerText, int width,
             DataGridViewContentAlignment alignment, bool readOnly = true)
         {
@@ -310,21 +333,28 @@ namespace MSIFAITOOLS
                 lblEmpty.Visible = false;
 
                 dgvParts.Rows.Insert(insertIndex,
-                    (insertIndex + 1).ToString(),
-                    page.ToString(),
-                    number.ToString(),
-                    string.Empty,
-                    string.Empty,
-                    string.Empty,
-                    string.Empty,
-                    string.Empty,
-                    string.Empty,
-                    string.Empty,
-                    PartVerifyStatus.NotChecked,
-                    string.Empty,
-                    string.Empty,
-                    string.Empty,
-                    string.Empty);
+                    number.ToString(),                  // 番号
+                    string.Empty,                       // 部材名
+                    string.Empty,                       // 部品名
+                    string.Empty,                       // 区分
+                    string.Empty,                       // 数量
+                    string.Empty,                       // 切断寸法
+                    string.Empty,                       // 部品コード
+                    string.Empty,                       // 参照元（保存时按「手工追加」写入）
+                    string.Empty,                       // H下限
+                    string.Empty,                       // H上限
+                    string.Empty,                       // W下限
+                    string.Empty,                       // W上限
+                    string.Empty,                       // 使い分け
+                    string.Empty,                       // 特注
+                    page.ToString(),                    // 页码
+                    string.Empty,                       // 部品図番
+                    string.Empty,                       // 基本寸法
+                    PartVerifyStatus.NotChecked,        // 校验状态
+                    string.Empty,                       // 备注
+                    string.Empty,                       // 数据来源
+                    string.Empty,                       // 登录时间
+                    (insertIndex + 1).ToString());      // No
 
                 row = dgvParts.Rows[insertIndex];
                 row.Tag = null;
@@ -534,6 +564,13 @@ namespace MSIFAITOOLS
 
                 string status = GetCellText(row, "colVerifyStatus");
                 part.VerifyStatus = IsKnownVerifyStatus(status) ? status : PartVerifyStatus.NotChecked;
+                part.MemberName = GetCellText(row, "colMemberName");
+                part.HeightMin = GetCellText(row, "colHeightMin");
+                part.HeightMax = GetCellText(row, "colHeightMax");
+                part.WidthMin = GetCellText(row, "colWidthMin");
+                part.WidthMax = GetCellText(row, "colWidthMax");
+                part.UsageKind = GetCellText(row, "colUsageKind");
+                part.SpecialNote = GetCellText(row, "colSpecialNote");
                 part.Remark = GetCellText(row, "colRemark");
 
                 if (origin != null)

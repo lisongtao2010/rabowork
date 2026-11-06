@@ -15,12 +15,19 @@ namespace MSIFAITOOLS.Services
             Page = page < 0 ? 0 : page;
             Number = number;
             PartName = Clean(partName);
+            MemberName = string.Empty;
             PartDrawingNo = Clean(partDrawingNo);
             FrameKind = Clean(frameKind);
             Quantity = Clean(quantity);
             BasicSize = Clean(basicSize);
             CutSize = Clean(cutSize);
             PartCode = Clean(partCode);
+            HeightMin = string.Empty;
+            HeightMax = string.Empty;
+            WidthMin = string.Empty;
+            WidthMax = string.Empty;
+            UsageKind = string.Empty;
+            SpecialNote = string.Empty;
             VerifyStatus = PartVerifyStatus.NotChecked;
             Remark = string.Empty;
             SourceKind = string.Empty;
@@ -42,13 +49,33 @@ namespace MSIFAITOOLS.Services
         /// <summary>部品名。</summary>
         public string PartName { get; private set; }
 
+        /// <summary>
+        /// 部材名：用「番号」去该页目录的 <c>parts_info.json</c> 找圈号（<c>"text": "4"</c> 且
+        /// <c>"display": "④4"</c> 的 <c>callouts</c>），取这些圈号所在零件图（<c>index</c>）的全部
+        /// <c>texts</c>，<b>去掉含数字的文字</b>、<b>去掉「XX部」形式的位置标记</b>，
+        /// 剩下的去重后用 <c>|</c> 连接（例如 <c>縦枠</c>、<c>鴨居|上レール</c>）。
+        /// 由 <see cref="PartsInfoIndex.ResolveCalloutMemberName(int)"/> 计算；
+        /// 番号对不上圈号 / 没有 <c>parts_info.json</c> 的行留空。
+        /// <b>留空的行写库时会统一填成 <see cref="MemberNameFallback"/>＝「その他」</b>
+        /// （<see cref="PartBasicInfoRepository.BindInsertParameters"/>），所以画面上不会出现空的「部材名」。
+        /// </summary>
+        public string MemberName { get; set; }
+
+        /// <summary>
+        /// 「部材名」为空时使用的默认值「その他」。
+        /// 写库时由 <see cref="PartBasicInfoRepository.BindInsertParameters"/> 统一套用
+        /// （老数据库打开时 <see cref="PartBasicInfoRepository"/> 也会把空值补成这个值），
+        /// 所以画面上看到的「部材名」不会再有空白格。
+        /// </summary>
+        public const string MemberNameFallback = "その他";
+
         /// <summary>部品図番（表格没有该列时为空）。</summary>
         public string PartDrawingNo { get; private set; }
 
-        /// <summary>枠区分。</summary>
+        /// <summary>区分（表格的「枠区分」列；数据库列名 = 区分）。</summary>
         public string FrameKind { get; private set; }
 
-        /// <summary>員数（可能是数字或字母，故按文本保存）。</summary>
+        /// <summary>数量（表格的「員数」列；数据库列名 = 数量。可能是数字或字母，故按文本保存）。</summary>
         public string Quantity { get; private set; }
 
         /// <summary>基本寸法。</summary>
@@ -60,6 +87,27 @@ namespace MSIFAITOOLS.Services
         /// <summary>部品コード。</summary>
         public string PartCode { get; private set; }
 
+        /// <summary>H下限（特寸時使い分け表的 H 下限；没有这项数据时为空）。数据库列名 = H下限。</summary>
+        public string HeightMin { get; set; }
+
+        /// <summary>H上限（特寸時使い分け表的 H 上限；没有这项数据时为空）。数据库列名 = H上限。</summary>
+        public string HeightMax { get; set; }
+
+        /// <summary>W下限（特寸時使い分け表的 W 下限；没有这项数据时为空）。数据库列名 = W下限。</summary>
+        public string WidthMin { get; set; }
+
+        /// <summary>W上限（特寸時使い分け表的 W 上限；没有这项数据时为空）。数据库列名 = W上限。</summary>
+        public string WidthMax { get; set; }
+
+        /// <summary>使い分け（同一部品按品種 / 尺寸分用哪一个时的区分；画面上手工填）。数据库列名 = 使い分け。</summary>
+        public string UsageKind { get; set; }
+
+        /// <summary>
+        /// 特注（追加対応特注寸法 等）。【CMD 分析】第 4 步把 tz.json 的「追加対応特注寸法」写在这里，
+        /// 其余来源留空、可在画面上手工填。数据库列名 = 特注。
+        /// </summary>
+        public string SpecialNote { get; set; }
+
         /// <summary>坐标校验状态（取值见 <see cref="PartVerifyStatus"/>）。</summary>
         public string VerifyStatus { get; set; }
 
@@ -69,7 +117,14 @@ namespace MSIFAITOOLS.Services
         /// <summary>数据来源（取值见 <see cref="PartSourceKind"/>）：AI 分析 / CMD 分析・アッセンブリ図 / CMD 分析・要領図 / 手工追加。</summary>
         public string SourceKind { get; set; }
 
-        /// <summary>来源标识（取值见 <see cref="PartSourceTag"/>）：要領図 / アッセンブリ図 / AI分析 / 手工追加。</summary>
+        /// <summary>
+        /// 参照元（数据库列名 = 参照元）。<b>写库时一律写成该行的「図番」</b>
+        /// （<see cref="PartBasicInfoRepository.BindInsertParameters"/>；
+        /// 老数据库打开时 <see cref="PartBasicInfoRepository"/> 也会把旧值改成「図番」），
+        /// 所以数据库 / 画面上的「参照元」永远等于「図番」。
+        /// 这个属性在内存里保存的是来源简称（取值见 <see cref="PartSourceTag"/>：要領図 /
+        /// アッセンブリ図 / tz.json / AI分析 / 手工追加），只作为「数据来源」为空时的兜底判定用。
+        /// </summary>
         public string SourceTag { get; set; }
 
         /// <summary>来源文件（plu_table.txt 的完整路径）。</summary>
@@ -140,6 +195,9 @@ namespace MSIFAITOOLS.Services
     /// <summary>
     /// 部品基本信息的「来源标识」：<see cref="PartSourceKind"/> 的简称（同时作为写入数据库的文字）。
     /// 用于在画面上一眼区分这一行的部品来自「要領図」还是「アッセンブリ図」自身的部品表。
+    /// <b>注意</b>：数据库的「参照元」列现在写的是该行的「図番」
+    /// （见 <see cref="PartBasicInfo.SourceTag"/>），这些简称只留在内存对象上，
+    /// 以及老数据「数据来源」为空时的兜底判定里。
     /// </summary>
     internal static class PartSourceTag
     {

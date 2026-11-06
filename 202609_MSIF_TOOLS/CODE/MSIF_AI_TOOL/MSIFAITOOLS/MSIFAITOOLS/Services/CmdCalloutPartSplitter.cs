@@ -173,7 +173,9 @@ namespace MSIFAITOOLS.Services
 
         /// <summary>
         /// 是否为阶段 A 从 <c>01_アッセンブリ図_部品機能情報.csv</c> 登录的行
-        /// （「来源标识」= アッセンブリ図；老数据没有该列时看「数据来源」）。
+        /// （「数据来源」= <see cref="PartSourceKind.CmdAssembly"/>；
+        /// 老数据没有这一列时退回看「参照元」——注意现在「参照元」写的是该行的図番，
+        /// 只有升级前的老行才可能是 <see cref="PartSourceTag.CmdAssembly"/>）。
         /// </summary>
         public static bool IsAssemblyRow(PartBasicInfo part)
         {
@@ -182,13 +184,13 @@ namespace MSIFAITOOLS.Services
                 return false;
             }
 
-            if (string.Equals(part.SourceTag, PartSourceTag.CmdAssembly, StringComparison.Ordinal))
+            if (string.Equals(part.SourceKind, PartSourceKind.CmdAssembly, StringComparison.Ordinal))
             {
                 return true;
             }
 
-            return string.IsNullOrEmpty(part.SourceTag) &&
-                string.Equals(part.SourceKind, PartSourceKind.CmdAssembly, StringComparison.Ordinal);
+            return string.IsNullOrEmpty(part.SourceKind) &&
+                string.Equals(part.SourceTag, PartSourceTag.CmdAssembly, StringComparison.Ordinal);
         }
 
         /// <summary>
@@ -265,6 +267,13 @@ namespace MSIFAITOOLS.Services
                 source.PartCode);
 
             clone.VerifyStatus = source.VerifyStatus;
+            clone.MemberName = source.MemberName;
+            clone.HeightMin = source.HeightMin;
+            clone.HeightMax = source.HeightMax;
+            clone.WidthMin = source.WidthMin;
+            clone.WidthMax = source.WidthMax;
+            clone.UsageKind = source.UsageKind;
+            clone.SpecialNote = source.SpecialNote;
             clone.Remark = remark;
             clone.SourceKind = source.SourceKind;
             clone.SourceTag = source.SourceTag;

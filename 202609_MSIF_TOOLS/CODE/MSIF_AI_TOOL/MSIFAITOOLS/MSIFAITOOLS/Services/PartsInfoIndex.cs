@@ -162,10 +162,18 @@ namespace MSIFAITOOLS.Services
         /// <summary>零件图 index → 该零件图里出现过的全部文字（归一化后），用于判定包含关系。</summary>
         private readonly Dictionary<int, HashSet<string>> _partTexts;
 
+        /// <summary>
+        /// 零件图 index → 该零件图里出现过的文字（<b>原文</b>，按出现顺序、按归一化去重）。
+        /// 「部材名」（<see cref="ResolveCalloutMemberName(int)"/>）要把原文展示给人看，
+        /// 不能用归一化后的大写文字。
+        /// </summary>
+        private readonly Dictionary<int, List<string>> _partTextWords;
+
         private PartsInfoIndex(Dictionary<string, List<PartMarkPoint>> points,
             Dictionary<string, List<PartMarkPoint>> calloutPoints,
             Dictionary<string, string> calloutDisplays,
-            Dictionary<int, HashSet<string>> partTexts, string loadError)
+            Dictionary<int, HashSet<string>> partTexts,
+            Dictionary<int, List<string>> partTextWords, string loadError)
         {
             _points = points ??
                 new Dictionary<string, List<PartMarkPoint>>(StringComparer.Ordinal);
@@ -174,6 +182,7 @@ namespace MSIFAITOOLS.Services
             _calloutDisplays = calloutDisplays ??
                 new Dictionary<string, string>(StringComparer.Ordinal);
             _partTexts = partTexts ?? new Dictionary<int, HashSet<string>>();
+            _partTextWords = partTextWords ?? new Dictionary<int, List<string>>();
             LoadError = loadError;
         }
 
@@ -205,11 +214,12 @@ namespace MSIFAITOOLS.Services
             Dictionary<string, string> calloutDisplays =
                 new Dictionary<string, string>(StringComparer.Ordinal);
             Dictionary<int, HashSet<string>> partTexts = new Dictionary<int, HashSet<string>>();
+            Dictionary<int, List<string>> partTextWords = new Dictionary<int, List<string>>();
 
             if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
             {
                 return new PartsInfoIndex(points, calloutPoints, calloutDisplays, partTexts,
-                    "找不到 " + FileName);
+                    partTextWords, "找不到 " + FileName);
             }
 
             string json;
@@ -221,7 +231,7 @@ namespace MSIFAITOOLS.Services
             catch (Exception ex)
             {
                 return new PartsInfoIndex(points, calloutPoints, calloutDisplays, partTexts,
-                    "读取失败（" + ex.GetType().Name + "：" + ex.Message + "）");
+                    partTextWords, "读取失败（" + ex.GetType().Name + "：" + ex.Message + "）");
             }
 
             object root;
@@ -236,7 +246,7 @@ namespace MSIFAITOOLS.Services
             catch (Exception ex)
             {
                 return new PartsInfoIndex(points, calloutPoints, calloutDisplays, partTexts,
-                    "解析失败（" + ex.GetType().Name + "：" + ex.Message + "）");
+                    partTextWords, "解析失败（" + ex.GetType().Name + "：" + ex.Message + "）");
             }
 
             object[] parts = root as object[];
@@ -244,7 +254,7 @@ namespace MSIFAITOOLS.Services
             if (parts == null)
             {
                 return new PartsInfoIndex(points, calloutPoints, calloutDisplays, partTexts,
-                    "格式不是零件数组");
+                    partTextWords, "格式不是零件数组");
             }
 
             // 数组顺序（老文件没有 index 字段时当零件图序号用）
@@ -291,7 +301,8 @@ namespace MSIFAITOOLS.Services
                             continue;
                         }
 
-                        string key = NormalizeMark(ReadString(textNode, "text"));
+                        string rawText = ReadString(textNode, "text").Trim();
+                        string key = NormalizeMark(rawText);
 
                         if (key.Length == 0)
                         {
@@ -299,6 +310,20 @@ namespace MSIFAITOOLS.Services
                         }
 
                         textSet.Add(key);
+
+                        // 部材名要用原文：按零件图收集一遍（同一张图上按归一化去重、保留出现顺序）
+                        List<string> words;
+
+                        if (!partTextWords.TryGetValue(partIndex, out words))
+                        {
+                            words = new List<string>();
+                            partTextWords.Add(partIndex, words);
+                        }
+
+                        if (!ContainsWord(words, key))
+                        {
+                            words.Add(rawText);
+                        }
 
                         PartMarkPoint point = ReadPoint(textNode);
 
@@ -387,7 +412,8 @@ namespace MSIFAITOOLS.Services
                 }
             }
 
-            return new PartsInfoIndex(points, calloutPoints, calloutDisplays, partTexts, null);
+            return new PartsInfoIndex(points, calloutPoints, calloutDisplays, partTexts, partTextWords,
+                null);
         }
 
         /// <summary>
@@ -454,6 +480,132 @@ namespace MSIFAITOOLS.Services
             }
 
             return BuildSplitPlan(display, raw);
+        }
+
+        /// <summary>
+        /// 用「番号」（圈号）取「部材名」：在 <c>callouts</c> 里找 <c>"text": "4"</c> 且
+        /// <c>"display": "④4"</c> 的数据（<c>no</c> 也必须是 4），取这些数据所在零件图
+        /// （<c>index</c>）的全部 <c>texts</c>，<b>去掉含数字的文字</b>、
+        /// <b>去掉「XX部」形式的位置标记</b>，剩下的去重后用 <c>|</c> 连接。
+        /// 例：番号 4 的两个零件图 texts 是 <c>4 / N部 / A部 / 縦枠 / M部</c> → <c>縦枠</c>。
+        /// 找不到该圈号、或过滤后不剩文字时返回空串。
+        /// </summary>
+        /// <param name="number">番号（圈内数字）。</param>
+        public string ResolveCalloutMemberName(int number)
+        {
+            return ResolveCalloutMemberName(number.ToString(CultureInfo.InvariantCulture));
+        }
+
+        /// <summary>同 <see cref="ResolveCalloutMemberName(int)"/>，参数是圈号文字（如 <c>4</c>）。</summary>
+        public string ResolveCalloutMemberName(string numberText)
+        {
+            string key = OnlyAsciiDigits(NormalizeMark(numberText));
+
+            if (key.Length == 0)
+            {
+                return string.Empty;
+            }
+
+            List<PartMarkPoint> points;
+
+            if (!_calloutPoints.TryGetValue(key, out points) || points == null || points.Count == 0)
+            {
+                return string.Empty;
+            }
+
+            List<string> names = new List<string>();
+            HashSet<string> seen = new HashSet<string>(StringComparer.Ordinal);
+            HashSet<int> partIndexes = new HashSet<int>();
+
+            foreach (PartMarkPoint point in points)
+            {
+                // 同一张零件图上出现多次只取一次文字
+                if (point == null || !partIndexes.Add(point.PartIndex))
+                {
+                    continue;
+                }
+
+                List<string> words;
+
+                if (!_partTextWords.TryGetValue(point.PartIndex, out words) || words == null)
+                {
+                    continue;
+                }
+
+                foreach (string word in words)
+                {
+                    if (!IsMemberNameWord(word))
+                    {
+                        continue;
+                    }
+
+                    if (seen.Add(NormalizeMark(word)))
+                    {
+                        names.Add(word);
+                    }
+                }
+            }
+
+            return names.Count == 0 ? string.Empty : string.Join("|", names.ToArray());
+        }
+
+        /// <summary>
+        /// 是否是「部材名」的文字：非空、<b>不含数字</b>（圈号 / 尺寸 / 図番都不算部材名）、
+        /// 且<b>不以「部」结尾</b>（<c>A部</c> / <c>M部</c> 是位置标记，不是部材）。
+        /// </summary>
+        private static bool IsMemberNameWord(string word)
+        {
+            if (string.IsNullOrEmpty(word))
+            {
+                return false;
+            }
+
+            string normalized = NormalizeMark(word);
+
+            if (normalized.Length == 0 || HasAsciiDigit(normalized))
+            {
+                return false;
+            }
+
+            return !normalized.EndsWith("部", StringComparison.Ordinal);
+        }
+
+        /// <summary>文字里是否含 ASCII 数字（全角数字已由 <see cref="NormalizeMark"/> 转成半角）。</summary>
+        private static bool HasAsciiDigit(string value)
+        {
+            if (string.IsNullOrEmpty(value))
+            {
+                return false;
+            }
+
+            foreach (char ch in value)
+            {
+                if (ch >= '0' && ch <= '9')
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>文字列表里是否已有归一化后等于 <paramref name="key"/> 的文字（部材名去重用）。</summary>
+        private static bool ContainsWord(IList<string> words, string key)
+        {
+            if (words == null || words.Count == 0)
+            {
+                return false;
+            }
+
+            foreach (string word in words)
+            {
+                if (string.Equals(NormalizeMark(word), key, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         /// <summary>

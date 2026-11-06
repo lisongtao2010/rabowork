@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 
 namespace MSIFAITOOLS.Services
@@ -257,6 +258,10 @@ namespace MSIFAITOOLS.Services
                     return;
                 }
 
+                // 部材名：用「番号」在 parts_info.json 的 callouts 里找圈号，取该圈号所在零件图的
+                // texts（去掉数字、去掉「XX部」）用 | 连接（例：番号 4 → 縦枠）
+                int memberNamed = ApplyMemberNames(outputDirectory, stem, result.Parts);
+
                 int saved = repository.Save(result.DrawingNo, result.Parts);
 
                 summary.SavedFileCount++;
@@ -271,6 +276,13 @@ namespace MSIFAITOOLS.Services
                 PartAnalysisService.ReportLog(onLog, LogKind.Success,
                     string.Format("  登录成功：{0} 条（図番 {1}）", saved, result.DrawingNo));
 
+                if (memberNamed > 0)
+                {
+                    PartAnalysisService.ReportLog(onLog, LogKind.Info, string.Format(
+                        "  部材名：{0} 行按「番号 → 圈号 → 零件图 texts」取自 {1}",
+                        memberNamed, PartsInfoIndex.FileName));
+                }
+
                 PartAnalysisService.LogSampleRows(onLog, result.Parts);
             }
             catch (Exception ex)
@@ -284,10 +296,88 @@ namespace MSIFAITOOLS.Services
         }
 
         /// <summary>
+        /// 【第 1 步】填「部材名」：用每行的「番号」到该页目录的 <c>parts_info.json</c> 找圈号
+        /// （<c>"text": "4"</c> 且 <c>"display": "④4"</c> 的 <c>callouts</c>），
+        /// 取该圈号所在零件图（<c>index</c>）的全部 <c>texts</c>，<b>去掉含数字的文字</b>、
+        /// <b>去掉「XX部」形式的位置标记</b>，剩下的去重后用 <c>|</c> 连接
+        /// （见 <see cref="PartsInfoIndex.ResolveCalloutMemberName(int)"/>）。
+        /// 同一页的 <c>parts_info.json</c> 只读一次；读不到时该页的行留空（不报错、不影响入库）。
+        /// </summary>
+        /// <returns>填了部材名的行数。</returns>
+        private static int ApplyMemberNames(string outputDirectory, string drawingNo, IList<PartBasicInfo> parts)
+        {
+            if (parts == null || parts.Count == 0)
+            {
+                return 0;
+            }
+
+            Dictionary<int, PartsInfoIndex> indexes = new Dictionary<int, PartsInfoIndex>();
+            int named = 0;
+
+            foreach (PartBasicInfo part in parts)
+            {
+                if (part == null || part.Number <= 0)
+                {
+                    continue;
+                }
+
+                PartsInfoIndex index = LoadMemberNameIndex(outputDirectory, drawingNo, part.Page, indexes);
+
+                if (index == null)
+                {
+                    continue;
+                }
+
+                string memberName = index.ResolveCalloutMemberName(part.Number);
+
+                if (memberName.Length == 0)
+                {
+                    continue;
+                }
+
+                part.MemberName = memberName;
+                named++;
+            }
+
+            return named;
+        }
+
+        /// <summary>
+        /// 读取该页目录的 <c>parts_info.json</c>（第 1 页 <c>&lt;根&gt;\&lt;図番&gt;</c>，
+        /// 第 2 页起 <c>&lt;根&gt;\&lt;図番&gt;_P2</c>）；同一页只读一次，读不到时缓存 null。
+        /// </summary>
+        private static PartsInfoIndex LoadMemberNameIndex(string outputDirectory, string drawingNo, int page,
+            Dictionary<int, PartsInfoIndex> cache)
+        {
+            PartsInfoIndex cached;
+
+            if (cache.TryGetValue(page, out cached))
+            {
+                return cached;
+            }
+
+            int pageNumber = page <= 1 ? 1 : page;
+            string folder = pageNumber == 1
+                ? drawingNo
+                : drawingNo + "_P" + pageNumber.ToString(CultureInfo.InvariantCulture);
+            string path = Path.Combine(outputDirectory ?? string.Empty, folder, PartsInfoIndex.FileName);
+            PartsInfoIndex index = PartsInfoIndex.Load(path);
+
+            if (index != null && !string.IsNullOrEmpty(index.LoadError))
+            {
+                index = null;
+            }
+
+            cache[page] = index;
+
+            return index;
+        }
+
+        /// <summary>
         /// 第 2 步「圈号拆分」（旧称「阶段 A2」）：按圈号（<c>parts_info.json</c> 的 <c>callouts</c>）
         /// 把アッセンブリ図 的部品行按位置分割。
         ///
-        /// 只处理「来源标识 = アッセンブリ図」的行（<see cref="CmdCalloutPartSplitter.IsAssemblyRow"/>）：
+        /// 只处理「参照元 = アッセンブリ図」的行（<see cref="CmdCalloutPartSplitter.IsAssemblyRow"/>）：
         /// 用行上的「番号」找 <c>text</c> / <c>display</c> 自洽的圈号，圈号必须出现在 <b>index 不同</b>、
         /// <b>texts 互为包含</b>的零件图里，才按坐标定方向（左右 / 上下）把方向加到部品名前并拆成多条。
         /// 有变化时整张覆盖写回（<see cref="PartBasicInfoRepository.Save"/> 先删后插，必须提交全部行）。
@@ -625,10 +715,25 @@ namespace MSIFAITOOLS.Services
             }
         }
 
-        /// <summary>是否为第 4 步写入的行（来源标识 = tz.json）。</summary>
+        /// <summary>
+        /// 是否为第 4 步写入的行（「数据来源」= CMD分析・tz.json）。
+        /// 「参照元」现在写的是该行的図番，所以这里看「数据来源」；
+        /// 老数据没有「数据来源」时退回看「参照元」（升级前的老行可能还是 tz.json）。
+        /// </summary>
         private static bool IsTzRow(PartBasicInfo part)
         {
-            return part != null && string.Equals(part.SourceTag, PartSourceTag.CmdTz, StringComparison.Ordinal);
+            if (part == null)
+            {
+                return false;
+            }
+
+            if (string.Equals(part.SourceKind, PartSourceKind.CmdTz, StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            return string.IsNullOrEmpty(part.SourceKind) &&
+                string.Equals(part.SourceTag, PartSourceTag.CmdTz, StringComparison.Ordinal);
         }
 
         /// <summary>优先用清单里的分类依据；清单里没有该図番时退回一览的 Evidence。</summary>

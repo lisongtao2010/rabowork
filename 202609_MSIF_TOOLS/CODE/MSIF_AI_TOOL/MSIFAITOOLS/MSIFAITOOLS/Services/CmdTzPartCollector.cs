@@ -77,6 +77,9 @@ namespace MSIFAITOOLS.Services
         /// <summary>部品コード 无效（空 / 占位符 / 不含英文字母）而跳过的条数。</summary>
         public int InvalidCodeRowCount { get; set; }
 
+        /// <summary>明细里带「追加不要」这类字样（Excel 明说不要追加）而跳过的条数。</summary>
+        public int NoNeedRowCount { get; set; }
+
         /// <summary>同一品種 + 部品名 + 部品コード 重复而跳过的条数。</summary>
         public int SkippedRowCount { get; set; }
     }
@@ -97,7 +100,12 @@ namespace MSIFAITOOLS.Services
     ///         —— 与第 3 步「要領図部品追加」的判定完全一致；</item>
     ///   <item>命中的条目转成 <see cref="PartBasicInfo"/>：図番 = アッセンブリ図 の図番、页码 = 1，
     ///         部品名 / 枠区分 / 部品コード 取 tz.json 的同名列，追加対応特注寸法进备注
-    ///         （<c>品種：片引戸；特注寸法：2199 ≦Ｗ</c>），校验状态 = 未校验；</item>
+    ///         （<c>品種：片引戸；特注寸法：2199 ≦Ｗ</c>）、<b>特注 = <see cref="SpecialNoteMark"/></b>（<c>1</c>），
+    ///         校验状态 = 未校验；</item>
+    ///   <item>追加対応特注寸法由 <see cref="ApplySpecialSize"/> 解析成 H / W 范围：
+    ///         <c>2199 ≦Ｗ</c> → W下限 = 2199、W上限 = 9999（只写一边时另一边固定 9999 / 0）；</item>
+    ///   <item>明细里带「追加不要」这类字样（品種 / 部品名 / 枠区分 / 部品コード / 追加対応特注寸法 任一处，
+    ///         见 <see cref="NoNeedMarks"/>）→ <b>整条不追加</b>；</item>
     ///   <item>部品コード 必须是含英文字母的编码（空 / 占位符 / 纯数字一律丢弃），
     ///         同一「品種 + 部品名 + 部品コード」只登录一条；</item>
     ///   <item>番号由调用方给起始值后连续编号（唯一索引是 図番 + 页码 + 番号 + 部品コード）。</item>
@@ -119,6 +127,31 @@ namespace MSIFAITOOLS.Services
 
         /// <summary>备注里「特注寸法」的前缀（追加対応特注寸法）。</summary>
         public const string RemarkSpecialSizePrefix = "特注寸法：";
+
+        /// <summary>
+        /// 「特注」列的值：tz.json 的明细都是「追加対応」部品，一律标 <c>1</c>
+        /// （特注寸法原文留在备注里对照，见 <see cref="RemarkSpecialSizePrefix"/>）。
+        /// </summary>
+        public const string SpecialNoteMark = "1";
+
+        /// <summary>
+        /// 明细里出现这些字样（写在 品種 / 部品名 / 枠区分 / 部品コード / 追加対応特注寸法 任一处）
+        /// 就表示这张 Excel 明确说不要追加，整条跳过（判定忽略全角 / 空白 / 大小写）。
+        /// </summary>
+        private static readonly string[] NoNeedMarks = new string[]
+        {
+            "追加不要", "追加しない", "追加なし", "追加無し"
+        };
+
+        /// <summary>
+        /// 特注寸法只写下限时的上限固定值（<c>2199 ≦Ｗ</c> → W下限 2199、W上限 9999）。
+        /// </summary>
+        public const int SpecialSizeOpenUpper = 9999;
+
+        /// <summary>
+        /// 特注寸法只写上限时的下限固定值（<c>Ｗ ≦ 2199</c> → W下限 0、W上限 2199）。
+        /// </summary>
+        public const int SpecialSizeOpenLower = 0;
 
         /// <summary>tz.json 顶层存放明细的键。</summary>
         private const string ItemKey = "items";
@@ -425,6 +458,14 @@ namespace MSIFAITOOLS.Services
                 result.MatchedEntryCount++;
                 AddKindText(result.MatchedKindTexts, entry.Variety);
 
+                // Excel 上明写「追加不要」这类字样：不追加到部品基本信息
+                if (IsNoNeedEntry(entry))
+                {
+                    result.NoNeedRowCount++;
+
+                    continue;
+                }
+
                 if (!IsValidPartCode(entry.PartCode))
                 {
                     result.InvalidCodeRowCount++;
@@ -447,6 +488,10 @@ namespace MSIFAITOOLS.Services
                     string.Empty, entry.PartCode);
 
                 part.Remark = BuildRemark(entry.Variety, entry.SpecialSize);
+                // 特注列 = 1（tz.json 的明细都是「追加対応」部品，统一标 1；特注寸法原文留在备注里对照）
+                part.SpecialNote = SpecialNoteMark;
+                // 按特注寸法写 H / W 范围（2199 ≦Ｗ → W下限 2199 / W上限 9999）
+                ApplySpecialSize(part, entry.SpecialSize);
                 part.SourceKind = PartSourceKind.CmdTz;
                 part.SourceTag = PartSourceTag.CmdTz;
                 part.SourceFile = sourcePath ?? string.Empty;
@@ -492,6 +537,12 @@ namespace MSIFAITOOLS.Services
                     FileName, result.InvalidCodeRowCount));
             }
 
+            if (result.NoNeedRowCount > 0)
+            {
+                AddNote(result.Notes, string.Format("{0}：明细写着「追加不要」{1} 条，没有追加到部品基本信息",
+                    FileName, result.NoNeedRowCount));
+            }
+
             if (result.SkippedRowCount > 0)
             {
                 AddNote(result.Notes, string.Format("{0}：品種 + 部品名 + 部品コード 重复 {1} 条，已去重",
@@ -517,6 +568,368 @@ namespace MSIFAITOOLS.Services
             }
 
             return remark;
+        }
+
+        // ── 特注寸法 → H / W 范围 ────────────────────────────────────────────
+
+        /// <summary>
+        /// 把「追加対応特注寸法」（Excel 部品表原文，例如 <c>2199 ≦Ｗ</c>）解析成 H / W 的上下限
+        /// 写进 <paramref name="part"/>：
+        /// <list type="bullet">
+        ///   <item><c>2199 ≦Ｗ</c>（只写下限）→ W下限 = 2199、W上限 = <see cref="SpecialSizeOpenUpper"/>（9999 固定）；</item>
+        ///   <item><c>Ｗ ≦ 2199</c>（只写上限）→ W下限 = <see cref="SpecialSizeOpenLower"/>（0 固定）、W上限 = 2199；</item>
+        ///   <item><c>1800 ≦Ｗ ≦ 2000</c> → 两端都按写的不等号取；<c>＜</c>（开区间）各让 1
+        ///         （<c>1299 ≦Ｗ ＜ 1749</c> → 1299 ~ 1748）；</item>
+        ///   <item><c>Ｈ</c> 同理（写进 H下限 / H上限）；一行里 H 与 W 同时写也能分开取。</item>
+        /// </list>
+        /// 认不出的写法（没有数字、没有 Ｈ / Ｗ）一律留空，不猜。
+        /// </summary>
+        public static void ApplySpecialSize(PartBasicInfo part, string specialSize)
+        {
+            if (part == null)
+            {
+                return;
+            }
+
+            List<SpecialSizeToken> tokens = TokenizeSpecialSize(specialSize);
+            double? heightMin = null;
+            double? heightMax = null;
+            double? widthMin = null;
+            double? widthMax = null;
+
+            for (int index = 0; index < tokens.Count; index++)
+            {
+                SpecialSizeToken token = tokens[index];
+
+                if (token.Kind != SpecialSizeTokenKind.Axis)
+                {
+                    continue;
+                }
+
+                bool isHeight = string.Equals(token.Text, "H", StringComparison.Ordinal);
+                double? min = isHeight ? heightMin : widthMin;
+                double? max = isHeight ? heightMax : widthMax;
+
+                // 左：「数字 不等号 変数」（2199 ≦Ｗ）→ 下限
+                if (index >= 2 && tokens[index - 1].Kind == SpecialSizeTokenKind.Operator &&
+                    tokens[index - 2].Kind == SpecialSizeTokenKind.Number)
+                {
+                    ApplyRelation(tokens[index - 1].Text, true, tokens[index - 2].Text, ref min, ref max);
+                }
+
+                // 右：「変数 不等号 数字」（Ｗ ≦ 2199）→ 上限
+                if (index + 2 < tokens.Count && tokens[index + 1].Kind == SpecialSizeTokenKind.Operator &&
+                    tokens[index + 2].Kind == SpecialSizeTokenKind.Number)
+                {
+                    ApplyRelation(tokens[index + 1].Text, false, tokens[index + 2].Text, ref min, ref max);
+                }
+
+                if (!min.HasValue && !max.HasValue)
+                {
+                    continue;
+                }
+
+                if (isHeight)
+                {
+                    heightMin = min;
+                    heightMax = max;
+                }
+                else
+                {
+                    widthMin = min;
+                    widthMax = max;
+                }
+            }
+
+            // 只写了一边的用固定值补齐：2199 ≦Ｗ → 上限 9999；Ｗ ≦ 2199 → 下限 0
+            FinalizeBound(ref heightMin, ref heightMax);
+            FinalizeBound(ref widthMin, ref widthMax);
+
+            part.HeightMin = FormatBound(heightMin);
+            part.HeightMax = FormatBound(heightMax);
+            part.WidthMin = FormatBound(widthMin);
+            part.WidthMax = FormatBound(widthMax);
+        }
+
+        /// <summary>
+        /// 只写了一边时补齐另一边（有下限没上限 → 上限 <see cref="SpecialSizeOpenUpper"/>；
+        /// 有上限没下限 → 下限 <see cref="SpecialSizeOpenLower"/>），两边矛盾时交换；
+        /// 两边都没有就都留空（认不出的写法不猜）。
+        /// </summary>
+        private static void FinalizeBound(ref double? min, ref double? max)
+        {
+            if (min.HasValue && !max.HasValue)
+            {
+                max = SpecialSizeOpenUpper;
+            }
+            else if (!min.HasValue && max.HasValue)
+            {
+                min = SpecialSizeOpenLower;
+            }
+            else if (min.HasValue && max.HasValue && min.Value > max.Value)
+            {
+                double swap = min.Value;
+                min = max.Value;
+                max = swap;
+            }
+        }
+
+        /// <summary>
+        /// 把一个「数字 不等号 変数」/「変数 不等号 数字」的条件并进 <paramref name="min"/> /
+        /// <paramref name="max"/>。<paramref name="axisOnRight"/> = true 表示数字在左边（<c>2199 ≦Ｗ</c>）。
+        /// <c>＜</c>（开区间）按下限 +1 / 上限 -1 处理；同一方向出现多次时取更严的那个。
+        /// </summary>
+        private static void ApplyRelation(string op, bool axisOnRight, string numberText,
+            ref double? min, ref double? max)
+        {
+            double value;
+
+            if (!double.TryParse(numberText, NumberStyles.Float, CultureInfo.InvariantCulture, out value))
+            {
+                return;
+            }
+
+            string relation = op ?? string.Empty;
+
+            if (axisOnRight)
+            {
+                // 「数字 不等号 変数」：数字 ≦ 変数 = 下限
+                if (relation == "<=")
+                {
+                    SetLower(ref min, value);
+                }
+                else if (relation == "<")
+                {
+                    SetLower(ref min, value + 1);
+                }
+                else if (relation == ">=")
+                {
+                    SetUpper(ref max, value);
+                }
+                else if (relation == ">")
+                {
+                    SetUpper(ref max, value - 1);
+                }
+                else if (relation == "=")
+                {
+                    SetLower(ref min, value);
+                    SetUpper(ref max, value);
+                }
+            }
+            else
+            {
+                // 「変数 不等号 数字」：変数 ≦ 数字 = 上限
+                if (relation == "<=")
+                {
+                    SetUpper(ref max, value);
+                }
+                else if (relation == "<")
+                {
+                    SetUpper(ref max, value - 1);
+                }
+                else if (relation == ">=")
+                {
+                    SetLower(ref min, value);
+                }
+                else if (relation == ">")
+                {
+                    SetLower(ref min, value + 1);
+                }
+                else if (relation == "=")
+                {
+                    SetLower(ref min, value);
+                    SetUpper(ref max, value);
+                }
+            }
+        }
+
+        /// <summary>记下限（同一方向出现多次时取更严的 = 更大的）。</summary>
+        private static void SetLower(ref double? min, double value)
+        {
+            min = !min.HasValue || value > min.Value ? value : min.Value;
+        }
+
+        /// <summary>记上限（同一方向出现多次时取更严的 = 更小的）。</summary>
+        private static void SetUpper(ref double? max, double value)
+        {
+            max = !max.HasValue || value < max.Value ? value : max.Value;
+        }
+
+        /// <summary>把算出来的范围值写成文字（整数不带小数点，最多 3 位小数）；null → 空串。</summary>
+        private static string FormatBound(double? value)
+        {
+            return value.HasValue
+                ? Math.Round(value.Value, 3).ToString("0.###", CultureInfo.InvariantCulture)
+                : string.Empty;
+        }
+
+        /// <summary>
+        /// 特注寸法归一化：全角转半角、去空白、转大写（复用 <see cref="NormalizeKey"/>），
+        /// 再把 <c>≦ ≧ ≤ ≥ ＜ ＞</c> 统一成 <c>&lt;= &gt;= &lt; &gt;</c>。
+        /// </summary>
+        private static string NormalizeSpecialSize(string value)
+        {
+            string text = NormalizeKey(value);
+
+            if (text.Length == 0)
+            {
+                return string.Empty;
+            }
+
+            StringBuilder builder = new StringBuilder(text.Length + 8);
+
+            foreach (char ch in text)
+            {
+                switch (ch)
+                {
+                    case '≦':
+                    case '≤':
+                        builder.Append("<=");
+                        break;
+                    case '≧':
+                    case '≥':
+                        builder.Append(">=");
+                        break;
+                    case '＜':
+                        builder.Append('<');
+                        break;
+                    case '＞':
+                        builder.Append('>');
+                        break;
+                    default:
+                        builder.Append(ch);
+                        break;
+                }
+            }
+
+            return builder.ToString();
+        }
+
+        /// <summary>
+        /// 把归一化后的特注寸法切成「数字 / 不等号 / Ｈ・Ｗ」记号，其它字（括弧、「かつ」等）直接丢掉。
+        /// </summary>
+        private static List<SpecialSizeToken> TokenizeSpecialSize(string specialSize)
+        {
+            List<SpecialSizeToken> tokens = new List<SpecialSizeToken>();
+            string text = NormalizeSpecialSize(specialSize);
+            int index = 0;
+
+            while (index < text.Length)
+            {
+                char ch = text[index];
+
+                if (char.IsDigit(ch) || ch == '.')
+                {
+                    int start = index;
+
+                    while (index < text.Length && (char.IsDigit(text[index]) || text[index] == '.'))
+                    {
+                        index++;
+                    }
+
+                    tokens.Add(new SpecialSizeToken(SpecialSizeTokenKind.Number,
+                        text.Substring(start, index - start)));
+
+                    continue;
+                }
+
+                if (ch == '<' || ch == '>' || ch == '=')
+                {
+                    int start = index;
+
+                    while (index < text.Length &&
+                        (text[index] == '<' || text[index] == '>' || text[index] == '='))
+                    {
+                        index++;
+                    }
+
+                    tokens.Add(new SpecialSizeToken(SpecialSizeTokenKind.Operator,
+                        text.Substring(start, index - start)));
+
+                    continue;
+                }
+
+                if (ch == 'H' || ch == 'W')
+                {
+                    tokens.Add(new SpecialSizeToken(SpecialSizeTokenKind.Axis, ch.ToString()));
+                    index++;
+
+                    continue;
+                }
+
+                index++;
+            }
+
+            return tokens;
+        }
+
+        /// <summary>特注寸法切出来的记号种类。</summary>
+        private enum SpecialSizeTokenKind
+        {
+            /// <summary>数字（含小数）。</summary>
+            Number,
+
+            /// <summary>不等号（<c>&lt;= &gt;= &lt; &gt; =</c>）。</summary>
+            Operator,
+
+            /// <summary>Ｈ / Ｗ。</summary>
+            Axis
+        }
+
+        /// <summary>特注寸法切出来的一个记号。</summary>
+        private struct SpecialSizeToken
+        {
+            public SpecialSizeToken(SpecialSizeTokenKind kind, string text)
+            {
+                Kind = kind;
+                Text = text;
+            }
+
+            public SpecialSizeTokenKind Kind { get; private set; }
+
+            public string Text { get; private set; }
+        }
+
+        // ── 追加不要 ─────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// 明细里带「追加不要」这类字样（写在 品種 / 部品名 / 枠区分 / 部品コード /
+        /// 追加対応特注寸法 任一处）→ 这张 Excel 明确说不要追加，整条跳过。
+        /// </summary>
+        private static bool IsNoNeedEntry(CmdTzEntry entry)
+        {
+            if (entry == null)
+            {
+                return false;
+            }
+
+            return ContainsNoNeedMark(entry.Variety) || ContainsNoNeedMark(entry.PartName) ||
+                ContainsNoNeedMark(entry.FrameKind) || ContainsNoNeedMark(entry.PartCode) ||
+                ContainsNoNeedMark(entry.SpecialSize);
+        }
+
+        /// <summary>
+        /// 文字里是否含 <see cref="NoNeedMarks"/> 里的任一个；判定用 <see cref="NormalizeKey"/>
+        /// （全角转半角、去空白、转大写），所以「追加 不要」这种中间带空格的写法也能命中。
+        /// </summary>
+        private static bool ContainsNoNeedMark(string value)
+        {
+            string key = NormalizeKey(value);
+
+            if (key.Length == 0)
+            {
+                return false;
+            }
+
+            foreach (string mark in NoNeedMarks)
+            {
+                if (key.IndexOf(mark, StringComparison.Ordinal) >= 0)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         /// <summary>往「命中品種」列表里加一个（忽略大小写去重）。</summary>
